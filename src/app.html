@@ -1,10 +1,25 @@
 <!doctype html>
 <html lang="en">
 	<head>
+		<meta name="robots" content="noindex, nofollow">
 		<meta charset="utf-8" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.svg" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js" integrity="sha512-csNcFYJniKjJxRWRV1R7fvnXrycHP6qDR21mgz1ZP55xY5d+aHLfo9/FcGDQLfn2IfngbAHd8LdfsagcCqgTcQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js" integrity="sha512-dlPw+ytv/6JyepmelABrgeYgHI0O+frEwgfnPdXDTOIZz+eDgfW07QXG02/O8COfivBdGNINy+Vex+lYmJ5rxw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+		
+		<meta http-equiv="Content-Security-Policy" content="
+			default-src 'self';
+			script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;
+			style-src 'self' 'unsafe-inline' https://cdn.svar.dev https://fonts.googleapis.com;
+			font-src *;
+			img-src 'self' data: *;
+			connect-src ws://localhost:5173 http://localhost:8080 https://sp24oze35os8x73r-lyo-inventory-proxy.onrender.com;
+			object-src 'none';
+			frame-ancestors 'none';
+			base-uri 'self';
+		">
+
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

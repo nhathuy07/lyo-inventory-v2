@@ -26,6 +26,7 @@
 		]
 	},
 	"dependencies": {
+		"@sveltejs/adapter-static": "^3.0.8",
 		"axios": "^1.11.0",
 		"wx-svelte-core": "^2.2.0",
 		"wx-svelte-filter": "^2.2.1",

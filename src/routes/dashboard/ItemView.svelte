@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Axios } from "axios";
+    import axios, { Axios } from "axios";
     import { onMount, setContext } from "svelte";
 
     // @ts-ignore
@@ -38,8 +38,12 @@
     // import Localization from "./Localization.svelte";
     // import {} from 'idb'
 
-    // let baseUrl = "https://lyochuyenhanghanquoc.mysapogo.com";
-    let baseUrl = "http://localhost:8080/api";
+    let baseUrl = ""
+    if (import.meta.env.MODE === "development") {
+        baseUrl = "http://localhost:8080/api"
+    } else {
+        baseUrl = "https://sp24oze35os8x73r-lyo-inventory-proxy.onrender.com/api";
+    }
     let accessToken;
     let isAccountAdmin;
     let ignore_brand_ids = [2137491, 2079114, 2047739, 1986245];
@@ -446,6 +450,7 @@
 
                             // @ts-ignore
                             if (
+                                // @ts-ignore
                                 sales_by_item.get(cursor.value.variant_id)
                                     ?.last_before_out_of_stock -
                                     cursor.value.timestamp <
@@ -1452,7 +1457,9 @@
     function ui_patching() {
         // Turning add-filter button to block
         const filterArea = document.getElementById("filter-area");
+
         const filterBuilder =
+            // @ts-ignore
             filterArea.getElementsByClassName("wx-filter-builder")[0];
         const filterBuilderToolbar =
             filterBuilder.getElementsByClassName("wx-toolbar")[0];
@@ -1504,6 +1511,7 @@
             const fval = filter_api.getValue();
             // @ts-ignore
             const fstate: Map<number, Object> =
+                // @ts-ignore
                 filter_api.getState().value._pool;
             await handle_filter_update(fval);
 
@@ -1514,8 +1522,11 @@
                 if (v[1].field && v[1].field == "c_sold") {
                     // @ts-ignore
                     if (
+                        // @ts-ignore
                         v[1].filter &&
+                        // @ts-ignore
                         v[1].filter == "less" &&
+                        // @ts-ignore
                         v[1].value == 20
                     ) {
                         // @ts-ignore
@@ -1533,62 +1544,209 @@
         }
     }
 
+    // Get base64 from image URL
+    async function getArrayBufferFromImageUrl(url: string): Promise<{a: ArrayBuffer, t: string}> {
+        try {
+            const resp = await axios.get(url, {
+                responseType: "arraybuffer",
+            });
+
+            return {a: resp.data, t: resp.headers["Content-Type"]?.toString()}
+
+        } catch (err) {
+            console.error("Error fetching image: ", err);
+            throw err; // important: don't let the error silently drop
+        }
+    }
+
+    const canvas = document.createElement("canvas")
+    async function downscaleImage(img: HTMLImageElement) {
+
+        return new Promise<ArrayBuffer>((resolve, reject) => {
+        canvas.width = 160
+        canvas.height = img.height / img.width * 160
+        
+        const ctx = canvas.getContext("2d")
+        // @ts-ignore
+        ctx.fillStyle = "white"
+        ctx?.fillRect(0, 0, canvas.width, canvas.height)
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+        canvas.toBlob(async (blob) => {
+            resolve(await blob.arrayBuffer())
+        })
+        })
+
+
+
+    }
+
     async function exportToXLSX() {
         // @ts-ignore
         const wb = new ExcelJS.Workbook();
         const ws = wb.addWorksheet("Sheet1");
 
-        const tbl_row = 3;
+        let tbl_row = 4;
+        const c_loc = locations.find((v) => v.id == selected_location_id);
+        const time = new Date();
+
+        console.log("Preparing data")
+        const rows: any[] = [];
+        inventory_info.forEach((v, _, __) => {
+            if (selected_skus.size == 0 || selected_skus.has(v.sku)) {
+                rows.push([
+                    v.sku,
+                    v.name,
+                    "",
+                    v.restock_third,
+                    v.restock_half,
+                    v.restock,
+                    v.c_incoming,
+                    v.brand,
+                    v.unit,
+                    v.included_tax_import_price,
+                    v.included_tax_price,
+                    v.included_tax_price_ecomm,
+                ]);
+            }
+        });
+
+        ws.getCell("A1").value = {
+            richText: [
+                { text: "Kho hàng: " },
+                {
+                    font: { bold: true },
+                    text: `${c_loc?.label} - ${c_loc?.address}`,
+                },
+            ],
+        };
+        ws.getCell("A2").value = {
+            richText: [
+                { text: "Thống kê lúc: " },
+                { font: { bold: true }, text: time.toLocaleString() },
+            ],
+        };
+
+        let col_headers = [
+            { name: "SKU", width: 17, filterButton: true },
+            { name: "Tên sản phẩm", width: 50, filterButton: true },
+            { name: "Ảnh", width: 30, filterButton: true },
+            {
+                name: "Số lượng đặt (= 1/3 SL bán)",
+                width: 13,
+                filterButton: true,
+            },
+            {
+                name: "Số lượng đặt (= 1/2 SL bán)",
+                width: 13,
+                filterButton: true,
+            },
+            { name: "SL bán (1 tháng)", width: 16, filterButton: true },
+            { name: "Đang về", width: 14, filterButton: true },
+            { name: "Nhãn hiệu", width: 14, filterButton: true },
+            { name: "Đơn vị tính", width: 14, filterButton: true },
+            { name: "Giá nhập", width: 14, filterButton: true },
+            { name: "Thành tiền (Shop)", width: 14, filterButton: true },
+            { name: "Thành tiền (TMĐT)", width: 14, filterButton: true },
+        ];
+
+        ws.columns = col_headers;
 
         // Define table
+        console.log("Generating table")
         ws.addTable({
             name: "Table",
             ref: `A${tbl_row}`,
             headerRow: true,
-            columns: [
-                { id: "sku", header: "SKU", width: 130 },
-                { id: "name", header: "Tên sản phẩm", width: 300 },
-                { id: "image", header: "Ảnh", width: 140 },
-                {
-                    id: "restock_third",
-                    header: "Số lượng đặt (= 1/3 SL bán tháng)",
-                    width: 100,
-                },
-                {
-                    id: "restock_half",
-                    header: "Số lượng đặt (= 1/2 SL bán tháng)",
-                    width: 100,
-                },
-                { id: "restock", header: "SL bán (1 tháng)" },
-                { id: "c_incoming", header: "Đang về" },
-                { id: "brand", header: "Nhãn hiệu" },
-                { id: "unit", header: "Đơn vị tính" },
-                { id: "included_tax_import_price", header: "Giá nhập" },
-                { id: "included_tax_price", header: "Thành tiền (Shop)" },
-                { id: "inclded_tax_price_ecomm", header: "Thành tiền (TMĐT)" },
-            ],
-            rows: inventory_info.forEach((v, _, __) => {
-                if ( selected_skus.size == 0 || selected_skus.has(v.sku)) {
-                    return [
-                        v.sku,
-                        v.name,
-                        "",
-                        v.restock_third,
-                        v.restock_half,
-                        v.restock,
-                        v.c_incoming,
-                        v.brand,
-                        v.unit,
-                        v.included_tax_import_price,
-                        v.included_tax_price,
-                        v.included_tax_price_ecomm,
-                    ];
-                }
-            }),
+            columns: col_headers,
+            rows: rows,
         });
 
         // Add image to cells
-        console.log(wb);
+        let imgs: any[] = [];
+
+        console.log("Fetching images")
+        const img = new Image();
+        for (const v of inventory_info) {
+            if (selected_skus.size == 0 || selected_skus.has(v.sku)) {
+                let img_ext = v.image_path.split(".").pop();
+
+                if (img_ext == "jpg") {
+                    img_ext = "jpeg";
+                }
+
+                const img_data = await getArrayBufferFromImageUrl(v.image_path);
+                let local_img_url = URL.createObjectURL(new Blob([img_data.a], {type: img_data.t}))
+                const imgLoadPromise = new Promise<void>((resolve, reject) => {
+                    img.onload = async function () {
+                        // console.log("IMG LOADED")
+                        imgs.push(
+                            [
+                                wb.addImage({
+                                    buffer: await downscaleImage(img),
+                                    extension: img_ext,
+                                }),
+                                (img.height / img.width) * 140,
+                            ],
+                            // img = undefined
+                        );
+                        URL.revokeObjectURL(local_img_url)
+                        resolve();
+                    };
+
+                    img.onerror = function () {
+                        imgs.push([undefined, 0]);
+                        resolve();
+                    };
+                });
+
+                
+                img.src = local_img_url
+                await imgLoadPromise;
+                // console.log(img_base64)
+            }
+        }
+
+        // console.log("IMGS_LEN", imgs.length)
+        console.log("Inserting images")
+        imgs.forEach((v, i) => {
+            // console.log(v);
+            if (v[0] != undefined) {
+                ws.addImage(v[0], {
+                    tl: { col: 2, row: tbl_row },
+                    ext: { width: 160, height: v[1] },
+                });
+            }
+
+            ws.getRow(tbl_row + 1).height = (v[1] + 10) * 0.75;
+            tbl_row++;
+        });
+
+        for (let r = 3; r <= 4 + rows.length; r++) {
+            const c_r = ws.getRow(r);
+
+            if (c_r) {
+                for (let c = 1; c <= col_headers.length; c++) {
+                    const c_c = c_r.getCell(c);
+                    if (c_c) {
+                        c_c.alignment = { wrapText: true };
+                    }
+                }
+            }
+        }
+
+        console.log("Writing buffer...")
+        let buffer = await wb.xlsx.writeBuffer();
+        let blob = new Blob([buffer], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+
+        console.log("Saving...")
+        // @ts-ignore
+        saveAs(
+            blob,
+            `Thống kê_${c_loc?.label.replace("W", "")}_${time.getDate()}-${time.getMonth() + 1}-${time.getFullYear()}.xlsx`,
+        );
     }
 
     onMount(async () => {
