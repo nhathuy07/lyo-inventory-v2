@@ -46,7 +46,7 @@
     }
 </script>
 
-<Willow>
+<Willow fonts={false}>
     <div class="outer">
         <div class="inner">
             <h1>Đăng nhập</h1>

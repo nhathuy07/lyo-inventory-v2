@@ -2,8 +2,6 @@
     import { Axios } from "axios";
     import { onMount, setContext } from "svelte";
 
-    import { utils, writeFileXLSX } from "xlsx";
-
     // @ts-ignore
 
     // @ts-ignore
@@ -1536,7 +1534,61 @@
     }
 
     async function exportToXLSX() {
-        
+        // @ts-ignore
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet("Sheet1");
+
+        const tbl_row = 3;
+
+        // Define table
+        ws.addTable({
+            name: "Table",
+            ref: `A${tbl_row}`,
+            headerRow: true,
+            columns: [
+                { id: "sku", header: "SKU", width: 130 },
+                { id: "name", header: "Tên sản phẩm", width: 300 },
+                { id: "image", header: "Ảnh", width: 140 },
+                {
+                    id: "restock_third",
+                    header: "Số lượng đặt (= 1/3 SL bán tháng)",
+                    width: 100,
+                },
+                {
+                    id: "restock_half",
+                    header: "Số lượng đặt (= 1/2 SL bán tháng)",
+                    width: 100,
+                },
+                { id: "restock", header: "SL bán (1 tháng)" },
+                { id: "c_incoming", header: "Đang về" },
+                { id: "brand", header: "Nhãn hiệu" },
+                { id: "unit", header: "Đơn vị tính" },
+                { id: "included_tax_import_price", header: "Giá nhập" },
+                { id: "included_tax_price", header: "Thành tiền (Shop)" },
+                { id: "inclded_tax_price_ecomm", header: "Thành tiền (TMĐT)" },
+            ],
+            rows: inventory_info.forEach((v, _, __) => {
+                if ( selected_skus.size == 0 || selected_skus.has(v.sku)) {
+                    return [
+                        v.sku,
+                        v.name,
+                        "",
+                        v.restock_third,
+                        v.restock_half,
+                        v.restock,
+                        v.c_incoming,
+                        v.brand,
+                        v.unit,
+                        v.included_tax_import_price,
+                        v.included_tax_price,
+                        v.included_tax_price_ecomm,
+                    ];
+                }
+            }),
+        });
+
+        // Add image to cells
+        console.log(wb);
     }
 
     onMount(async () => {
