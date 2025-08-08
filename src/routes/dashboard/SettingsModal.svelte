@@ -232,16 +232,13 @@
         {#if screen == "accountcfg"}
             <div style="text-align: left;">
                 <!-- <h2>Cài đặt</h2> -->
-                {#if !isAdmin}
-                    <Field label="Đổi mật khẩu">
-                        <div style="display: flex; gap: 10px">
-                            <Text type="password" placeholder="Mật khẩu cũ"
-                            ></Text>
-                            <Text type="password" placeholder="Mật khẩu mới"
-                            ></Text>
-                        </div>
-                    </Field>
-                {/if}
+
+                <Field width="500px" label="">
+                    <p><b>Username:</b> {current_user}</p>
+                    <Button onclick={async () => {await changeAccountPassword(current_user)}} type="secondary">Đổi mật khẩu</Button>
+
+                </Field>
+
                 {#if isAdmin}
                     <Field
                         label="Quản lí tài khoản"
