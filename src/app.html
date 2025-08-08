@@ -14,8 +14,8 @@
 			script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net;
 			style-src 'self' 'unsafe-inline' https://cdn.svar.dev https://fonts.googleapis.com https://cdn.jsdelivr.net;
 			font-src *;
-			img-src 'self' data: *;
-			connect-src ws://localhost:5173 http://localhost:8080 https://sp24oze35os8x73r-lyo-inventory-proxy.onrender.com;
+			img-src 'self' data: * blob:;
+			connect-src 'self' https://sapo.dktcdn.net http://localhost:8080 https://sp24oze35os8x73r-lyo-inventory-proxy.onrender.com;
 			object-src 'none';
 			frame-ancestors 'none';
 			base-uri 'self';

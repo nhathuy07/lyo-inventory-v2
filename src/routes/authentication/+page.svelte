@@ -43,7 +43,7 @@
             let j = JSON.parse(r.data);
             sessionStorage.setItem("token", j.token);
             sessionStorage.setItem("isadmin", j.isadmin.toString());
-
+            sessionStorage.setItem("username", username)
             // Go to dashboard page
             await goto("dashboard", {invalidateAll: false});
         } else if (r.status == HttpStatusCode.Unauthorized) {

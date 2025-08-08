@@ -33,19 +33,22 @@
     import { goto } from "$app/navigation";
     import LoadingThrobber from "./LoadingThrobber.svelte";
     import { applyAction } from "$app/forms";
+    import SettingsModal from "./SettingsModal.svelte";
+    import { toast_failure } from "./toast";
 
     // import vi from "./Localization.svelte"
     // import Localization from "./Localization.svelte";
     // import {} from 'idb'
 
-    let proxyUrl = ""
-    let baseUrl = ""
+    let proxyUrl = "";
+    let baseUrl = "";
     if (import.meta.env.MODE === "development") {
-        proxyUrl = "http://localhost:8080/api"
-        baseUrl = "http://localhost:8080"
+        proxyUrl = "http://localhost:8080/api";
+        baseUrl = "http://localhost:8080";
     } else {
-        proxyUrl = "https://sp24oze35os8x73r-lyo-inventory-proxy.onrender.com/api";
-        baseUrl =  "https://sp24oze35os8x73r-lyo-inventory-proxy.onrender.com"
+        proxyUrl =
+            "https://sp24oze35os8x73r-lyo-inventory-proxy.onrender.com/api";
+        baseUrl = "https://sp24oze35os8x73r-lyo-inventory-proxy.onrender.com";
     }
     let accessToken;
     let isAccountAdmin;
@@ -143,7 +146,8 @@
     function handle_request_err(err: any) {
         is_loading = false;
 
-        alert(`Lỗi khi xử lí yêu cầu: ${err}`);
+        toast_failure(`Lỗi khi xử lí yêu cầu: ${err}`)
+        // alert(`Lỗi khi xử lí yêu cầu: ${err}`);
 
         // console.error("ERR", err);
     }
@@ -847,8 +851,8 @@
     // let data = $state([{sku: "8809871383333"}])
 
     const sortDirections = [
-        { id: 1, icon: "wxi-arrow-up" },
-        { id: -1, icon: "wxi-arrow-down" },
+        { id: 1, icon: "mdi mdi-arrow-up" },
+        { id: -1, icon: "mdi mdi-arrow-down" },
     ];
 
     const columns = [
@@ -1200,7 +1204,7 @@
     function handle_grid_data_request(ev: any) {
         const { row } = ev;
         if (row) {
-            data = inventory_info.slice(row.start, row.end+10);
+            data = inventory_info.slice(row.start, row.end + 10);
         }
     }
 
@@ -1548,43 +1552,46 @@
     }
 
     // Get base64 from image URL
-    async function getArrayBufferFromImageUrl(url: string): Promise<{a: ArrayBuffer, t: string}> {
+    async function getArrayBufferFromImageUrl(
+        url: string,
+    ): Promise<{ a: ArrayBuffer; t: string }> {
         try {
             const resp = await axios.get(url, {
                 responseType: "arraybuffer",
             });
 
-            return {a: resp.data, t: resp.headers["Content-Type"]?.toString()}
-
+            return {
+                a: resp.data,
+                t: resp.headers["Content-Type"]?.toString(),
+            };
         } catch (err) {
             console.error("Error fetching image: ", err);
             throw err; // important: don't let the error silently drop
         }
     }
 
-    const canvas = document.createElement("canvas")
+    const canvas = document.createElement("canvas");
     async function downscaleImage(img: HTMLImageElement) {
-
         return new Promise<ArrayBuffer>((resolve, reject) => {
-        canvas.width = 160
-        canvas.height = img.height / img.width * 160
-        
-        const ctx = canvas.getContext("2d")
-        // @ts-ignore
-        ctx.fillStyle = "white"
-        ctx?.fillRect(0, 0, canvas.width, canvas.height)
-        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height)
+            canvas.width = 160;
+            canvas.height = (img.height / img.width) * 160;
 
-        canvas.toBlob(async (blob) => {
-            resolve(await blob.arrayBuffer())
-        })
-        })
+            const ctx = canvas.getContext("2d");
+            // @ts-ignore
+            ctx.fillStyle = "white";
+            ctx?.fillRect(0, 0, canvas.width, canvas.height);
+            ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-
-
+            canvas.toBlob(async (blob) => {
+                resolve(await blob.arrayBuffer());
+            });
+        });
     }
 
     async function exportToXLSX() {
+
+        is_loading = true
+
         // @ts-ignore
         const wb = new ExcelJS.Workbook();
         const ws = wb.addWorksheet("Sheet1");
@@ -1593,7 +1600,7 @@
         const c_loc = locations.find((v) => v.id == selected_location_id);
         const time = new Date();
 
-        console.log("Preparing data")
+        console.log("Preparing data");
         const rows: any[] = [];
         inventory_info.forEach((v, _, __) => {
             if (selected_skus.size == 0 || selected_skus.has(v.sku)) {
@@ -1656,7 +1663,7 @@
         ws.columns = col_headers;
 
         // Define table
-        console.log("Generating table")
+        console.log("Generating table");
         ws.addTable({
             name: "Table",
             ref: `A${tbl_row}`,
@@ -1668,7 +1675,7 @@
         // Add image to cells
         let imgs: any[] = [];
 
-        console.log("Fetching images")
+        console.log("Fetching images");
         const img = new Image();
         for (const v of inventory_info) {
             if (selected_skus.size == 0 || selected_skus.has(v.sku)) {
@@ -1679,7 +1686,9 @@
                 }
 
                 const img_data = await getArrayBufferFromImageUrl(v.image_path);
-                let local_img_url = URL.createObjectURL(new Blob([img_data.a], {type: img_data.t}))
+                let local_img_url = URL.createObjectURL(
+                    new Blob([img_data.a], { type: img_data.t }),
+                );
                 const imgLoadPromise = new Promise<void>((resolve, reject) => {
                     img.onload = async function () {
                         // console.log("IMG LOADED")
@@ -1693,7 +1702,7 @@
                             ],
                             // img = undefined
                         );
-                        URL.revokeObjectURL(local_img_url)
+                        URL.revokeObjectURL(local_img_url);
                         resolve();
                     };
 
@@ -1703,15 +1712,14 @@
                     };
                 });
 
-                
-                img.src = local_img_url
+                img.src = local_img_url;
                 await imgLoadPromise;
                 // console.log(img_base64)
             }
         }
 
         // console.log("IMGS_LEN", imgs.length)
-        console.log("Inserting images")
+        console.log("Inserting images");
         imgs.forEach((v, i) => {
             // console.log(v);
             if (v[0] != undefined) {
@@ -1738,24 +1746,32 @@
             }
         }
 
-        console.log("Writing buffer...")
+        console.log("Writing buffer...");
         let buffer = await wb.xlsx.writeBuffer();
         let blob = new Blob([buffer], {
             type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         });
 
-        console.log("Saving...")
+        console.log("Saving...");
+
+
+        is_loading = false
         // @ts-ignore
         saveAs(
             blob,
             `Thống kê_${c_loc?.label.replace("W", "")}_${time.getDate()}-${time.getMonth() + 1}-${time.getFullYear()}.xlsx`,
         );
+
+
+
     }
 
+    let settings_modal_visible = $state(false);
+
     async function logout() {
-        await a.delete(`${baseUrl}/revoke`)
-        sessionStorage.clear()
-        goto("/authentication")
+        await a.delete(`${baseUrl}/revoke`);
+        sessionStorage.clear();
+        goto("/authentication");
     }
 
     onMount(async () => {
@@ -1773,16 +1789,26 @@
                             id="collapse-side-panel"
                             onclick={toggle_side_panel}
                             type="primary"
-                            icon="wxi-menu"
+                            icon="mdi mdi-menu"
                         ></Button>
-                        <Button onclick={soft_reload} icon="wxi-refresh">
+                        <Button onclick={soft_reload} icon="mdi mdi-refresh">
                             Tải lại
                         </Button>
 
-                        <Button type="danger" onclick={logout}>
-                            Đăng xuất
-                        </Button>
+                        <!-- Settings button -->
+                        <Button
+                            icon="mdi mdi-cog"
+                            onclick={() => {
+                                settings_modal_visible = true;
+                            }}
+                        ></Button>
 
+                        <!-- Logout button -->
+                        <Button
+                            type="danger"
+                            onclick={logout}
+                            icon="mdi mdi-logout"
+                        ></Button>
                     </div>
                     <Field label="Kho hàng " position="top">
                         <div style="margin-top: 5px;">
@@ -1805,6 +1831,7 @@
                         >
                     </div>
                     <div class="export-btn-wrapper">
+                        <Button type="secondary block">Kiểm hàng</Button>
                         <Button type="secondary block" onclick={exportToXLSX}
                             >Xuất file Excel</Button
                         >
@@ -1890,17 +1917,31 @@
                             <Button
                                 width="36"
                                 type="default"
-                                icon="wxi-menu"
+                                icon="mdi mdi-menu"
                                 onclick={toggle_side_panel}
                             ></Button>
 
-                            <Button onclick={soft_reload} icon="wxi-refresh">
+                            <Button
+                                onclick={soft_reload}
+                                icon="mdi mdi-refresh"
+                            >
                                 Tải lại
                             </Button>
 
-                            <Button type="danger" onclick={logout}>
-                                Đăng xuất
-                            </Button>
+                            <!-- Settings button -->
+                            <Button
+                                icon="mdi mdi-cog"
+                                onclick={() => {
+                                    settings_modal_visible = true;
+                                }}
+                            ></Button>
+
+                            <!-- Logout button -->
+                            <Button
+                                type="danger"
+                                onclick={logout}
+                                icon="mdi mdi-logout"
+                            ></Button>
                         </div>
                     {/if}
 
@@ -1940,6 +1981,12 @@
                                 <p style="margin-bottom: 0px;">Đang tải...</p>
                             </div>
                         </Modal>
+                    </Portal>
+                {/if}
+
+                {#if settings_modal_visible}
+                    <Portal>
+                        <SettingsModal bind:shown={settings_modal_visible}></SettingsModal>
                     </Portal>
                 {/if}
 
@@ -2001,6 +2048,8 @@
         }
 
         .export-btn-wrapper {
+            display: flex;
+            gap: 10px;
             margin-bottom: 20px;
         }
     </style>
