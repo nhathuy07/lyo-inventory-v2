@@ -38,11 +38,14 @@
     // import Localization from "./Localization.svelte";
     // import {} from 'idb'
 
+    let proxyUrl = ""
     let baseUrl = ""
     if (import.meta.env.MODE === "development") {
-        baseUrl = "http://localhost:8080/api"
+        proxyUrl = "http://localhost:8080/api"
+        baseUrl = "http://localhost:8080"
     } else {
-        baseUrl = "https://sp24oze35os8x73r-lyo-inventory-proxy.onrender.com/api";
+        proxyUrl = "https://sp24oze35os8x73r-lyo-inventory-proxy.onrender.com/api";
+        baseUrl =  "https://sp24oze35os8x73r-lyo-inventory-proxy.onrender.com"
     }
     let accessToken;
     let isAccountAdmin;
@@ -148,7 +151,7 @@
     async function fetchRawPagesFromProductsAPI() {
         // Probe the number of pages
         let p_incomplete = false;
-        let first_page_resp = await a.get(`${baseUrl}/admin/products.json`, {
+        let first_page_resp = await a.get(`${proxyUrl}/admin/products.json`, {
             params: {
                 page: 1,
                 limit: 1,
@@ -171,13 +174,13 @@
         // Batch-fetching products API, 3 at a time due to the 2 req/second ratelimit, each reqs taking ~600 ms to process
         for (let i = 1; i <= total_pages - 2; i += 3) {
             let x = await Promise.all([
-                a.get(`${baseUrl}/admin/products.json`, {
+                a.get(`${proxyUrl}/admin/products.json`, {
                     params: { page: i, limit: batch_limit },
                 }),
-                a.get(`${baseUrl}/admin/products.json`, {
+                a.get(`${proxyUrl}/admin/products.json`, {
                     params: { page: i + 1, limit: batch_limit },
                 }),
-                a.get(`${baseUrl}/admin/products.json`, {
+                a.get(`${proxyUrl}/admin/products.json`, {
                     params: { page: i + 2, limit: batch_limit },
                 }),
                 // a.get(`${baseUrl}/admin/products.json`, {params: {page: i+3, limit: batch_limit}}),
@@ -591,7 +594,7 @@
 
         // Get the newer records first
         // The API doesn't support millisecond timestamp for filtering, so we strip the millisecond part from our timestamps
-        let resp = await a.get(`${baseUrl}/admin/orders.json`, {
+        let resp = await a.get(`${proxyUrl}/admin/orders.json`, {
             params: {
                 page: 1,
                 limit: 1,
@@ -620,7 +623,7 @@
         if (JSON.parse(resp.data).metadata.total != 0) {
             for (let i = 1; i <= Math.max(total_pages - 2, 1); i += 3) {
                 let x = await Promise.all([
-                    a.get(`${baseUrl}/admin/orders.json`, {
+                    a.get(`${proxyUrl}/admin/orders.json`, {
                         params: {
                             page: i,
                             limit: batch_limit,
@@ -630,7 +633,7 @@
                             // modified_on_max: time_end.toISOString().split(".")[0]+"Z",
                         },
                     }),
-                    a.get(`${baseUrl}/admin/orders.json`, {
+                    a.get(`${proxyUrl}/admin/orders.json`, {
                         params: {
                             page: i + 1,
                             limit: batch_limit,
@@ -640,7 +643,7 @@
                             // modified_on_max: time_end.toISOString().split(".")[0]+"Z",
                         },
                     }),
-                    a.get(`${baseUrl}/admin/orders.json`, {
+                    a.get(`${proxyUrl}/admin/orders.json`, {
                         params: {
                             page: i + 2,
                             limit: batch_limit,
@@ -811,7 +814,7 @@
     async function getSuppliers() {}
 
     async function getLocations(): Promise<Location[]> {
-        let resp = await a.get(`${baseUrl}/admin/locations.json`);
+        let resp = await a.get(`${proxyUrl}/admin/locations.json`);
         // let location_by_id: Map<number, string> = new Map()
         let location_by_id: Location[] = [];
         if (resp.status != 200) {
@@ -1197,7 +1200,7 @@
     function handle_grid_data_request(ev: any) {
         const { row } = ev;
         if (row) {
-            data = inventory_info.slice(row.start, row.end);
+            data = inventory_info.slice(row.start, row.end+10);
         }
     }
 
@@ -1749,6 +1752,12 @@
         );
     }
 
+    async function logout() {
+        await a.delete(`${baseUrl}/revoke`)
+        sessionStorage.clear()
+        goto("/authentication")
+    }
+
     onMount(async () => {
         await initialize();
     });
@@ -1769,6 +1778,11 @@
                         <Button onclick={soft_reload} icon="wxi-refresh">
                             Tải lại
                         </Button>
+
+                        <Button type="danger" onclick={logout}>
+                            Đăng xuất
+                        </Button>
+
                     </div>
                     <Field label="Kho hàng " position="top">
                         <div style="margin-top: 5px;">
@@ -1882,6 +1896,10 @@
 
                             <Button onclick={soft_reload} icon="wxi-refresh">
                                 Tải lại
+                            </Button>
+
+                            <Button type="danger" onclick={logout}>
+                                Đăng xuất
                             </Button>
                         </div>
                     {/if}
