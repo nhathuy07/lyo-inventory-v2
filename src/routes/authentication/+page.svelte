@@ -1,3 +1,6 @@
+
+
+
 <script>
     // @ts-ignore
     import { Willow, Text, Button, Field } from "wx-svelte-core";
@@ -79,11 +82,11 @@
             </div>
         </div>
     </div>
-</Willow>
 
-<style>
+
+    <style>
     /* Switch accent color */
-    :global(.wx-willow-theme) {
+    .wx-willow-theme {
         --wx-color-primary: #0520c3;
     }
     .outer {
@@ -102,3 +105,8 @@
         width: 400px;
     }
 </style>
+
+</Willow>
+
+
+
