@@ -32,9 +32,10 @@
     import { vi } from "./Localization";
     import { goto } from "$app/navigation";
     import LoadingThrobber from "./LoadingThrobber.svelte";
-    import { applyAction } from "$app/forms";
+    import { lazyLoadScript, lazyLoadStylesheets } from "./lazyLoadScript";
     import SettingsModal from "./SettingsModal.svelte";
     import { toast_failure } from "./toast";
+    import InventoryCheckupScreen from "./InventoryCheckupScreen.svelte";
 
     // import vi from "./Localization.svelte"
     // import Localization from "./Localization.svelte";
@@ -116,7 +117,7 @@
         restock_third?: number;
         c_sold?: number;
         c_incoming?: number;
-
+        c_on_hand?: number;
         image_path: string;
 
         inventory_levels_by_loc_id: Map<number, InventoryLevel>;
@@ -146,7 +147,7 @@
     function handle_request_err(err: any) {
         is_loading = false;
 
-        toast_failure(`Lỗi khi xử lí yêu cầu: ${err}`)
+        toast_failure(`Lỗi khi xử lí yêu cầu: ${err}`);
         // alert(`Lỗi khi xử lí yêu cầu: ${err}`);
 
         // console.error("ERR", err);
@@ -759,6 +760,7 @@
         _inv_info.forEach((variant, i, __) => {
             _inv_info[i].c_incoming = 0;
             _inv_info[i].c_sold = 0;
+
             _inv_info[i].restock = 0;
             _inv_info[i].restock_half = 0;
             _inv_info[i].restock_third = 0;
@@ -778,6 +780,8 @@
                     variant.inventory_levels_by_loc_id.get(location_id)
                         ?.outgoing ?? 0;
             }
+
+
 
             let sold = 0;
             let restock = 0;
@@ -804,6 +808,7 @@
                 _inv_info[i].restock_third = Math.round(restock / 3);
                 _inv_info[i].c_incoming = incoming;
                 _inv_info[i].c_sold = sold;
+                _inv_info[i].c_on_hand = _inv_info[i].inventory_levels_by_loc_id.get(location_id)?.on_hand
             }
         });
 
@@ -876,7 +881,7 @@
             header: "Tên sản phẩm",
             resize: true,
 
-            width: 300,
+            width: 250,
         },
 
         {
@@ -892,23 +897,29 @@
         },
         {
             id: "restock_third",
-            header: "SL đặt\n(1/3)",
+            header: "SL đặt\n(1/3 tháng)",
             resize: true,
 
             width: 100,
         },
         {
             id: "restock_half",
-            header: "SL đặt\n(1/2)",
+            header: "SL đặt\n(1/2 tháng)",
             resize: true,
 
             width: 100,
         },
         {
             id: "restock",
-            header: "SL bán\n(1 tháng)",
+            header: "SL đặt\n(1 tháng)",
             resize: true,
 
+            width: 100,
+        },
+        {
+            id: "c_on_hand",
+            header: "Tồn kho",
+            resize: true,
             width: 100,
         },
         {
@@ -989,32 +1000,38 @@
                 },
                 {
                     id: "restock_third",
-                    header: "SL đặt\n(1/3)",
+                    header: "SL đặt\n(1/3 tháng trước)",
                     resize: true,
 
                     width: 100,
                 },
                 {
                     id: "restock_half",
-                    header: "SL đặt\n(1/2)",
+                    header: "SL đặt\n(1/2 tháng)",
                     resize: true,
 
                     width: 100,
                 },
                 {
                     id: "restock",
-                    header: "SL bán\n(1 tháng)",
+                    header: "SL đặt\n(1 tháng)",
                     resize: true,
 
                     width: 100,
                 },
+                        {
+            id: "c_on_hand",
+            header: "Tồn kho",
+            resize: true,
+            width: 100,
+        },
                 {
                     id: "c_incoming",
                     header: "Đang về",
                     resize: true,
                     width: 100,
                 },
-
+                
                 {
                     id: "brand",
                     header: "Nhãn hiệu",
@@ -1080,6 +1097,11 @@
         {
             id: "c_sold",
             label: "Số lượng bán (30 ngày)",
+            type: "number",
+        },
+        {
+            id: "c_on_hand",
+            label: "Tồn kho",
             type: "number",
         },
         {
@@ -1477,6 +1499,7 @@
     }
 
     async function initialize() {
+        await lazyLoadStylesheets("https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css")
         ui_patching();
         accessToken = obtain_access_token();
         isAccountAdmin = sessionStorage.getItem("isadmin") == "true";
@@ -1589,8 +1612,17 @@
     }
 
     async function exportToXLSX() {
-
-        is_loading = true
+        const _ = await Promise.all([
+            lazyLoadScript(
+                "https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js",
+                "sha512-csNcFYJniKjJxRWRV1R7fvnXrycHP6qDR21mgz1ZP55xY5d+aHLfo9/FcGDQLfn2IfngbAHd8LdfsagcCqgTcQ==",
+            ),
+            lazyLoadScript(
+                "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js",
+                "sha512-dlPw+ytv/6JyepmelABrgeYgHI0O+frEwgfnPdXDTOIZz+eDgfW07QXG02/O8COfivBdGNINy+Vex+lYmJ5rxw==",
+            ),
+        ]);
+        is_loading = true;
 
         // @ts-ignore
         const wb = new ExcelJS.Workbook();
@@ -1754,19 +1786,16 @@
 
         console.log("Saving...");
 
-
-        is_loading = false
+        is_loading = false;
         // @ts-ignore
         saveAs(
             blob,
             `Thống kê_${c_loc?.label.replace("W", "")}_${time.getDate()}-${time.getMonth() + 1}-${time.getFullYear()}.xlsx`,
         );
-
-
-
     }
 
     let settings_modal_visible = $state(false);
+    let inventory_checkup_modal_visible = $state(false);
 
     async function logout() {
         await a.delete(`${baseUrl}/revoke`);
@@ -1831,7 +1860,7 @@
                         >
                     </div>
                     <div class="export-btn-wrapper">
-                        <Button type="secondary block">Kiểm hàng</Button>
+                        <Button type="secondary block" onclick={() => { inventory_checkup_modal_visible = true }}>Kiểm hàng</Button>
                         <Button type="secondary block" onclick={exportToXLSX}
                             >Xuất file Excel</Button
                         >
@@ -1986,8 +2015,16 @@
 
                 {#if settings_modal_visible}
                     <Portal>
-                        <SettingsModal bind:shown={settings_modal_visible}></SettingsModal>
+                        <SettingsModal bind:shown={settings_modal_visible}
+                        ></SettingsModal>
                     </Portal>
+                {/if}
+
+                {#if inventory_checkup_modal_visible}
+                    <Portal>
+                        <InventoryCheckupScreen bind:shown={inventory_checkup_modal_visible}></InventoryCheckupScreen>
+                    </Portal>
+                    
                 {/if}
 
                 <!-- TODO: Mobile-friendly UI -->
