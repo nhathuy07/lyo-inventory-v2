@@ -26,6 +26,15 @@
         // @ts-ignore
     } from "wx-svelte-filter";
 
+    import {
+        type VariantListing,
+        type InventoryLevel,
+        type VariantOrder,
+        type VariantSold,
+        type Location,
+        normalizeToEnglish,
+    } from "./Template";
+
     import SelectionCheckboxCell from "./SelectionCheckboxCell.svelte";
     import ImageCell from "./ImageCell.svelte";
 
@@ -36,6 +45,7 @@
     import SettingsModal from "./SettingsModal.svelte";
     import { toast_failure } from "./toast";
     import InventoryCheckupScreen from "./InventoryCheckupScreen.svelte";
+    import { imageToArrayBuffer } from "./imageToByteArray";
 
     // import vi from "./Localization.svelte"
     // import Localization from "./Localization.svelte";
@@ -72,7 +82,7 @@
         function onRejected(error) {
             // Any status codes that falls outside the range of 2xx cause this function to trigger
             // Do something with response error
-            console.log("AXIOS", error);
+
             handle_request_err(error);
             return Promise.reject(error);
         },
@@ -87,62 +97,6 @@
     // let current_date: Date = new Date()
 
     // Define interfaces
-
-    interface InventoryLevel {
-        incoming: number;
-        outgoing: number; // if incoming < 0, it means items
-        onway: number;
-        available: number;
-        on_hand: number;
-        restock?: number;
-    }
-
-    interface VariantListing {
-        name: string;
-        brand: string;
-        category: string;
-        tags: string[];
-        suppliers: string[];
-        sku: string;
-        variant_id: number;
-        product_id: number;
-        id: number;
-        variant_creation_date: Date | null;
-        included_tax_price: number; // storefront price
-        included_tax_price_ecomm: number; // e-commerce price
-        included_tax_import_price: number; // import price
-        unit: string;
-        restock?: number;
-        restock_half?: number;
-        restock_third?: number;
-        c_sold?: number;
-        c_incoming?: number;
-        c_on_hand?: number;
-        image_path: string;
-
-        inventory_levels_by_loc_id: Map<number, InventoryLevel>;
-    }
-
-    interface VariantOrder {
-        timestamp: number; // Use UNIX milisecond timestamp
-        variant_id: number;
-        amount: number;
-        location_id: number;
-    }
-
-    interface VariantSold {
-        variant_id: number;
-        last_before_out_of_stock: number;
-        // quantity_in_30_days: number;
-        // location_id?: number
-        quantity_in_30_days_by_loc_id: Map<number, number>;
-    }
-
-    interface Location {
-        id: number;
-        address: string;
-        label: string;
-    }
 
     function handle_request_err(err: any) {
         is_loading = false;
@@ -236,16 +190,24 @@
                         // @ts-expect-error
 
                         let v: VariantListing = {};
-                        v.sku = variant.sku;
-                        v.brand = product.brand;
-                        v.category = product.category;
+                        v.sku = variant.sku || "<Không xác định>";
+                        v.brand = product.brand || "<Không xác định>";
+                        v.category = product.category || "<Không xác định>";
                         v.id = variant.id;
                         v.product_id = variant.product_id;
                         // v.variant_id = variant.variant_id;
-                        v.name = variant.name;
+                        v.name = variant.name || "<Không xác định>";
+                        v.name_normalized = normalizeToEnglish(v.name);
+
                         v.suppliers = [];
                         v.tags = product.tags.split(",");
-                        v.unit = variant.unit;
+                        if (variant.unit) {
+                            v.unit =
+                                variant.unit.charAt(0).toUpperCase() +
+                                variant.unit.slice(1).toLowerCase();
+                        } else {
+                            v.unit = "<Không xác định>";
+                        }
                         v.variant_creation_date = null;
                         v.image_path = "";
 
@@ -781,8 +743,6 @@
                         ?.outgoing ?? 0;
             }
 
-
-
             let sold = 0;
             let restock = 0;
             if (sales_by_item.has(variant.id)) {
@@ -808,7 +768,10 @@
                 _inv_info[i].restock_third = Math.round(restock / 3);
                 _inv_info[i].c_incoming = incoming;
                 _inv_info[i].c_sold = sold;
-                _inv_info[i].c_on_hand = _inv_info[i].inventory_levels_by_loc_id.get(location_id)?.on_hand
+                _inv_info[i].c_on_hand =
+                    _inv_info[i].inventory_levels_by_loc_id.get(
+                        location_id,
+                    )?.on_hand;
             }
         });
 
@@ -1019,19 +982,19 @@
 
                     width: 100,
                 },
-                        {
-            id: "c_on_hand",
-            header: "Tồn kho",
-            resize: true,
-            width: 100,
-        },
+                {
+                    id: "c_on_hand",
+                    header: "Tồn kho",
+                    resize: true,
+                    width: 100,
+                },
                 {
                     id: "c_incoming",
                     header: "Đang về",
                     resize: true,
                     width: 100,
                 },
-                
+
                 {
                     id: "brand",
                     header: "Nhãn hiệu",
@@ -1070,7 +1033,7 @@
 
     const fields = [
         {
-            id: "name",
+            id: "name_normalized",
             label: "Tên sản phẩm",
             type: "text",
         },
@@ -1134,6 +1097,11 @@
             label: "Thành tiền (TMĐT)",
             type: "number",
         },
+        {
+            id: "category",
+            label: "Phân loại",
+            type: "text",
+        },
     ];
 
     let locations = $state(new Array<Location>());
@@ -1186,11 +1154,9 @@
         if (visible) {
             btn.style.display = "inline-block";
             list.style.display = "block";
-            console.log(btn);
         } else {
             btn.style.display = "none";
             list.style.display = "none";
-            console.log(btn);
         }
     }
 
@@ -1226,7 +1192,7 @@
     function handle_grid_data_request(ev: any) {
         const { row } = ev;
         if (row) {
-            data = inventory_info.slice(row.start, row.end + 10);
+            data = inventory_info.slice(row.start, row.end);
         }
     }
 
@@ -1245,6 +1211,7 @@
             included_tax_import_price: new Set<number>(),
             included_tax_price: new Set<number>(),
             included_tax_price_ecomm: new Set<number>(),
+            category: new Set<string>(),
         };
         source.forEach((v, _, __) => {
             // options.name.add(v.name)
@@ -1255,6 +1222,10 @@
 
             if (v.unit) {
                 options.unit.add(v.unit);
+            }
+
+            if (v.category) {
+                options.category.add(v.category);
             }
         });
 
@@ -1275,6 +1246,7 @@
             included_tax_price_ecomm: Array.from(
                 options.included_tax_price_ecomm,
             ),
+            category: Array.from(options.category),
         };
 
         // @ts-ignore
@@ -1365,6 +1337,12 @@
 
     function initialize_filter() {
         options = get_unique_values_for_fields(inventory_info);
+        // @ts-ignore
+        filter_api.on("delete-rule", ({ id }) => {
+            if (id == low_sales_filter_id) {
+                low_sales_filter_id = null;
+            }
+        });
     }
 
     let is_filter_empty = $state(true);
@@ -1376,6 +1354,7 @@
                 variants,
                 selected_location_id,
             );
+            low_sales_filter_id = null;
             filter_val = {};
             is_filter_empty = true;
         } else {
@@ -1385,6 +1364,7 @@
                 selected_location_id,
             );
             const filter = createArrayFilter(value);
+
             inventory_info = filter(inventory_info);
         }
 
@@ -1399,7 +1379,6 @@
         } else {
             is_filter_empty = false;
         }
-        console.log("FILTER", value.rules);
     }
 
     async function handle_location_change() {
@@ -1427,7 +1406,6 @@
             return;
         }
 
-        console.log(sorting_key);
         inventory_info.sort((a, b) => {
             // @ts-ignore
             let v_a = a[sorting_key as keyof InventoryLevel];
@@ -1478,9 +1456,8 @@
     let reload_cnt = $state(0);
 
     async function soft_reload() {
-        console.log("SOFT RELOAD");
         await initialize();
-        reload_cnt += 1;
+        key += 1;
     }
 
     function ui_patching() {
@@ -1499,7 +1476,11 @@
     }
 
     async function initialize() {
-        await lazyLoadStylesheets("https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css")
+        mutObserver.disconnect();
+
+        await lazyLoadStylesheets(
+            "https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css",
+        );
         ui_patching();
         accessToken = obtain_access_token();
         isAccountAdmin = sessionStorage.getItem("isadmin") == "true";
@@ -1508,6 +1489,9 @@
         await load_data();
         console.timeEnd("load_content");
         is_loading = false;
+
+        low_sales_filter_id = null;
+        filter_val = {};
 
         // Initialize Datagrid
         initialize_grid();
@@ -1536,7 +1520,6 @@
                 edit: false,
             });
 
-            // console.log(filter_api.getValue())
             // @ts-ignore
             const fval = filter_api.getValue();
             // @ts-ignore
@@ -1577,7 +1560,7 @@
     // Get base64 from image URL
     async function getArrayBufferFromImageUrl(
         url: string,
-    ): Promise<{ a: ArrayBuffer; t: string }> {
+    ): Promise<{ a: ArrayBuffer; t: string | undefined }> {
         try {
             const resp = await axios.get(url, {
                 responseType: "arraybuffer",
@@ -1606,6 +1589,7 @@
             ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
 
             canvas.toBlob(async (blob) => {
+                // @ts-ignore
                 resolve(await blob.arrayBuffer());
             });
         });
@@ -1632,7 +1616,6 @@
         const c_loc = locations.find((v) => v.id == selected_location_id);
         const time = new Date();
 
-        console.log("Preparing data");
         const rows: any[] = [];
         inventory_info.forEach((v, _, __) => {
             if (selected_skus.size == 0 || selected_skus.has(v.sku)) {
@@ -1643,6 +1626,7 @@
                     v.restock_third,
                     v.restock_half,
                     v.restock,
+                    v.c_on_hand,
                     v.c_incoming,
                     v.brand,
                     v.unit,
@@ -1672,7 +1656,7 @@
         let col_headers = [
             { name: "SKU", width: 17, filterButton: true },
             { name: "Tên sản phẩm", width: 50, filterButton: true },
-            { name: "Ảnh", width: 30, filterButton: true },
+            { name: "Ảnh", width: 20, filterButton: true },
             {
                 name: "Số lượng đặt (= 1/3 SL bán)",
                 width: 13,
@@ -1684,6 +1668,7 @@
                 filterButton: true,
             },
             { name: "SL bán (1 tháng)", width: 16, filterButton: true },
+            { name: "Tồn kho", width: 14, filterButton: true },
             { name: "Đang về", width: 14, filterButton: true },
             { name: "Nhãn hiệu", width: 14, filterButton: true },
             { name: "Đơn vị tính", width: 14, filterButton: true },
@@ -1695,7 +1680,7 @@
         ws.columns = col_headers;
 
         // Define table
-        console.log("Generating table");
+
         ws.addTable({
             name: "Table",
             ref: `A${tbl_row}`,
@@ -1707,7 +1692,6 @@
         // Add image to cells
         let imgs: any[] = [];
 
-        console.log("Fetching images");
         const img = new Image();
         for (const v of inventory_info) {
             if (selected_skus.size == 0 || selected_skus.has(v.sku)) {
@@ -1717,47 +1701,23 @@
                     img_ext = "jpeg";
                 }
 
-                const img_data = await getArrayBufferFromImageUrl(v.image_path);
-                let local_img_url = URL.createObjectURL(
-                    new Blob([img_data.a], { type: img_data.t }),
-                );
-                const imgLoadPromise = new Promise<void>((resolve, reject) => {
-                    img.onload = async function () {
-                        // console.log("IMG LOADED")
-                        imgs.push(
-                            [
-                                wb.addImage({
-                                    buffer: await downscaleImage(img),
-                                    extension: img_ext,
-                                }),
-                                (img.height / img.width) * 140,
-                            ],
-                            // img = undefined
-                        );
-                        URL.revokeObjectURL(local_img_url);
-                        resolve();
-                    };
-
-                    img.onerror = function () {
-                        imgs.push([undefined, 0]);
-                        resolve();
-                    };
-                });
-
-                img.src = local_img_url;
-                await imgLoadPromise;
-                // console.log(img_base64)
+                const imgData = await imageToArrayBuffer(v.image_path, 140);
+                imgs.push([
+                    wb.addImage({
+                        buffer: imgData.b,
+                        extension: img_ext,
+                    }),
+                    imgData.h,
+                ]);
+                console.log("fetched image")
             }
         }
 
-        // console.log("IMGS_LEN", imgs.length)
-        console.log("Inserting images");
         imgs.forEach((v, i) => {
-            // console.log(v);
             if (v[0] != undefined) {
                 ws.addImage(v[0], {
                     tl: { col: 2, row: tbl_row },
-                    ext: { width: 160, height: v[1] },
+                    ext: { width: 140, height: v[1] },
                 });
             }
 
@@ -1778,13 +1738,10 @@
             }
         }
 
-        console.log("Writing buffer...");
         let buffer = await wb.xlsx.writeBuffer();
         let blob = new Blob([buffer], {
             type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         });
-
-        console.log("Saving...");
 
         is_loading = false;
         // @ts-ignore
@@ -1805,21 +1762,157 @@
 
     onMount(async () => {
         await initialize();
+        mutObserver.observe(
+            // @ts-ignore
+            document.getElementById("filter-area"),
+            { childList: true, subtree: true },
+        );
     });
 </script>
 
-{#key reload_cnt}
-    <Locale words={vi}>
-        <Willow>
-            <div class="container">
-                <div class="ribbon" id="side-panel">
-                    <div style=" margin-bottom: 10px">
+<Locale words={vi}>
+    <Willow>
+        <div class="container">
+            <div class="ribbon" id="side-panel">
+                <div style=" margin-bottom: 10px">
+                    <Button
+                        id="collapse-side-panel"
+                        onclick={toggle_side_panel}
+                        type="primary"
+                        icon="mdi mdi-menu"
+                    ></Button>
+                    <Button onclick={soft_reload} icon="mdi mdi-refresh">
+                        Tải lại
+                    </Button>
+
+                    <!-- Settings button -->
+                    <Button
+                        icon="mdi mdi-cog"
+                        onclick={() => {
+                            settings_modal_visible = true;
+                        }}
+                    ></Button>
+
+                    <!-- Logout button -->
+                    <Button type="danger" onclick={logout} icon="mdi mdi-logout"
+                    ></Button>
+                </div>
+                <Field label="Kho hàng " position="top">
+                    <div style="margin-top: 5px;">
+                        <Select
+                            textField="label"
+                            options={locations}
+                            placeholder="Vui lòng chọn kho..."
+                            bind:value={selected_location_id}
+                            onchange={handle_location_change}
+                        ></Select>
+                    </div>
+                </Field>
+
+                <div class="select-btn-rows">
+                    <Button onclick={select_all} type="secondary block"
+                        >Chọn tất cả</Button
+                    >
+                    <Button onclick={deselect_all} type="secondary block"
+                        >Bỏ chọn tất cả</Button
+                    >
+                </div>
+                <div class="export-btn-wrapper">
+                    <Button
+                        type="secondary block"
+                        onclick={() => {
+                            inventory_checkup_modal_visible = true;
+                        }}>Kiểm hàng</Button
+                    >
+                    <Button type="secondary block" onclick={exportToXLSX}
+                        >Xuất file Excel</Button
+                    >
+                </div>
+
+                {#if low_sales.size != 0}
+                    <div class="toast-warn" style="margin-bottom: 15px">
+                        <p style="margin:0px">
+                            <b>{low_sales.size}</b> mặt hàng có số lượng bán quá
+                            thấp
+                        </p>
+                        {#if !low_sales_filter_id}
+                            <Button type="link" onclick={filter_low_sales}
+                                >Xem chi tiết</Button
+                            >
+                        {/if}
+                        {#if low_sales_filter_id}
+                            <Button
+                                type="link secondary"
+                                onclick={filter_low_sales}>Quay lại</Button
+                            >
+                        {/if}
+                    </div>
+                {/if}
+                <!-- Sorting part -->
+                <Field
+                    label="Sắp xếp & Lọc"
+                    position="top"
+                    style="margin-bottom: 5px"
+                >
+                    <div style="display: flex; gap: 10px; margin-top: 10px">
+                        <Select
+                            bind:value={sorting_key}
+                            onchange={apply_sorting_rule}
+                            options={fields}
+                            placeholder="Sắp xếp theo..."
+                        ></Select>
+                        <Segmented
+                            bind:value={sorting_dir}
+                            width="100"
+                            options={sortDirections}
+                            onchange={apply_sorting_rule}
+                        ></Segmented>
+                    </div>
+
+                    <div style="margin-top: 10px;">
+                        <!-- Filter part -->
+                        <Field position="top">
+                            <div
+                                id="filter-area"
+                                style="display: flex; flex-direction: column; margin-top:0px; gap: 10px"
+                            >
+                                {#if !is_filter_empty}
+                                    <Button
+                                        id="clear-filter-btn"
+                                        onclick={() =>
+                                            handle_filter_update(null)}
+                                        type="secondary block"
+                                        >Xóa mọi bộ lọc
+                                    </Button>
+                                {/if}
+
+                                <FilterBuilder
+                                    bind:this={filter_api}
+                                    bind:value={filter_val}
+                                    onchange={({ value }: { value: any }) =>
+                                        handle_filter_update(value)}
+                                    {fields}
+                                    {options}
+                                />
+                            </div>
+                        </Field>
+                    </div>
+                </Field>
+            </div>
+
+            <div class="grid">
+                {#if !side_panel_visibility}
+                    <div
+                        class="side-panel-toggle"
+                        style="margin-bottom: 10px; display: flex; gap: 5px"
+                    >
                         <Button
-                            id="collapse-side-panel"
-                            onclick={toggle_side_panel}
-                            type="primary"
+                            width="36"
+                            type="default"
                             icon="mdi mdi-menu"
+                            onclick={toggle_side_panel}
                         ></Button>
+
                         <Button onclick={soft_reload} icon="mdi mdi-refresh">
                             Tải lại
                         </Button>
@@ -1839,198 +1932,68 @@
                             icon="mdi mdi-logout"
                         ></Button>
                     </div>
-                    <Field label="Kho hàng " position="top">
-                        <div style="margin-top: 5px;">
-                            <Select
-                                textField="label"
-                                options={locations}
-                                placeholder="Vui lòng chọn kho..."
-                                bind:value={selected_location_id}
-                                onchange={handle_location_change}
-                            ></Select>
-                        </div>
-                    </Field>
+                {/if}
 
-                    <div class="select-btn-rows">
-                        <Button onclick={select_all} type="secondary block"
-                            >Chọn tất cả</Button
-                        >
-                        <Button onclick={deselect_all} type="secondary block"
-                            >Bỏ chọn tất cả</Button
-                        >
-                    </div>
-                    <div class="export-btn-wrapper">
-                        <Button type="secondary block" onclick={() => { inventory_checkup_modal_visible = true }}>Kiểm hàng</Button>
-                        <Button type="secondary block" onclick={exportToXLSX}
-                            >Xuất file Excel</Button
-                        >
-                    </div>
-
-                    {#if low_sales.size != 0}
-                        <div class="toast-warn" style="margin-bottom: 15px">
-                            <p style="margin:0px">
-                                <b>{low_sales.size}</b> mặt hàng có số lượng bán
-                                quá thấp
-                            </p>
-                            {#if !low_sales_filter_id}
-                                <Button type="link" onclick={filter_low_sales}
-                                    >Xem chi tiết</Button
-                                >
-                            {/if}
-                            {#if low_sales_filter_id}
-                                <Button
-                                    type="link secondary"
-                                    onclick={filter_low_sales}>Quay lại</Button
-                                >
-                            {/if}
-                        </div>
-                    {/if}
-                    <!-- Sorting part -->
-                    <Field
-                        label="Sắp xếp & Lọc"
-                        position="top"
-                        style="margin-bottom: 5px"
-                    >
-                        <div style="display: flex; gap: 10px; margin-top: 10px">
-                            <Select
-                                bind:value={sorting_key}
-                                onchange={apply_sorting_rule}
-                                options={fields}
-                                placeholder="Sắp xếp theo..."
-                            ></Select>
-                            <Segmented
-                                bind:value={sorting_dir}
-                                width="100"
-                                options={sortDirections}
-                                onchange={apply_sorting_rule}
-                            ></Segmented>
-                        </div>
-
-                        <div style="margin-top: 10px;">
-                            <!-- Filter part -->
-                            <Field position="top">
-                                <div
-                                    id="filter-area"
-                                    style="display: flex; flex-direction: column; margin-top:0px; gap: 10px"
-                                >
-                                    {#if !is_filter_empty}
-                                        <Button
-                                            id="clear-filter-btn"
-                                            onclick={() =>
-                                                handle_filter_update(null)}
-                                            type="secondary block"
-                                            >Xóa mọi bộ lọc
-                                        </Button>
-                                    {/if}
-
-                                    <FilterBuilder
-                                        bind:this={filter_api}
-                                        bind:value={filter_val}
-                                        onchange={({ value }) =>
-                                            handle_filter_update(value)}
-                                        {fields}
-                                        {options}
-                                    />
-                                </div>
-                            </Field>
-                        </div>
-                    </Field>
+                <div
+                    id="grid-container"
+                    style="height: calc(100%); width: 100%"
+                >
+                    {#key key}
+                        <Grid
+                            sizes={{ rowHeight: 165 }}
+                            {key}
+                            autoRowHeight
+                            dynamic={{
+                                rowCount: row_count,
+                                columnCount: 10,
+                            }}
+                            onrequestdata={handle_grid_data_request}
+                            bind:this={grid_api}
+                            {data}
+                            {columns}
+                            responsive={responsive_fields}
+                            split={{ left: left_split }}
+                            rowStyle={(row: any) =>
+                                low_sales.has(row.sku) ? "lowSales" : ""}
+                        ></Grid>
+                    {/key}
                 </div>
-
-                <div class="grid">
-                    {#if !side_panel_visibility}
-                        <div
-                            class="side-panel-toggle"
-                            style="margin-bottom: 10px; display: flex; gap: 5px"
-                        >
-                            <Button
-                                width="36"
-                                type="default"
-                                icon="mdi mdi-menu"
-                                onclick={toggle_side_panel}
-                            ></Button>
-
-                            <Button
-                                onclick={soft_reload}
-                                icon="mdi mdi-refresh"
-                            >
-                                Tải lại
-                            </Button>
-
-                            <!-- Settings button -->
-                            <Button
-                                icon="mdi mdi-cog"
-                                onclick={() => {
-                                    settings_modal_visible = true;
-                                }}
-                            ></Button>
-
-                            <!-- Logout button -->
-                            <Button
-                                type="danger"
-                                onclick={logout}
-                                icon="mdi mdi-logout"
-                            ></Button>
-                        </div>
-                    {/if}
-
-                    <div
-                        id="grid-container"
-                        style="height: calc(100%); width: 100%"
-                    >
-                        {#key key}
-                            <Grid
-                                sizes={{ rowHeight: 165 }}
-                                {key}
-                                autoRowHeight
-                                dynamic={{
-                                    rowCount: row_count,
-                                    columnCount: 10,
-                                }}
-                                onrequestdata={handle_grid_data_request}
-                                bind:this={grid_api}
-                                {data}
-                                {columns}
-                                responsive={responsive_fields}
-                                split={{ left: left_split }}
-                                rowStyle={(row: any) =>
-                                    low_sales.has(row.sku) ? "lowSales" : ""}
-                            ></Grid>
-                        {/key}
-                    </div>
-                </div>
-
-                {#if is_loading}
-                    <Portal>
-                        <Modal buttons={[]}>
-                            <div
-                                style="display:flex; flex-direction:column; align-items: center;"
-                            >
-                                <LoadingThrobber></LoadingThrobber>
-                                <p style="margin-bottom: 0px;">Đang tải...</p>
-                            </div>
-                        </Modal>
-                    </Portal>
-                {/if}
-
-                {#if settings_modal_visible}
-                    <Portal>
-                        <SettingsModal bind:shown={settings_modal_visible}
-                        ></SettingsModal>
-                    </Portal>
-                {/if}
-
-                {#if inventory_checkup_modal_visible}
-                    <Portal>
-                        <InventoryCheckupScreen bind:shown={inventory_checkup_modal_visible}></InventoryCheckupScreen>
-                    </Portal>
-                    
-                {/if}
-
-                <!-- TODO: Mobile-friendly UI -->
             </div>
-        </Willow>
-    </Locale>
+
+            {#if is_loading}
+                <Portal>
+                    <Modal buttons={[]}>
+                        <div
+                            style="display:flex; flex-direction:column; align-items: center;"
+                        >
+                            <LoadingThrobber></LoadingThrobber>
+                            <p style="margin-bottom: 0px;">Đang tải...</p>
+                        </div>
+                    </Modal>
+                </Portal>
+            {/if}
+
+            {#if settings_modal_visible}
+                <Portal>
+                    <SettingsModal bind:shown={settings_modal_visible}
+                    ></SettingsModal>
+                </Portal>
+            {/if}
+
+            {#if inventory_checkup_modal_visible}
+                <Portal>
+                    <InventoryCheckupScreen
+                        bind:shown={inventory_checkup_modal_visible}
+                        data={inventory_info}
+                        {locations}
+                        {selected_location_id}
+                    ></InventoryCheckupScreen>
+                </Portal>
+            {/if}
+
+            <!-- TODO: Mobile-friendly UI -->
+        </div>
+    </Willow>
 
     <style>
         /* Switch accent color */
@@ -2090,4 +2053,4 @@
             margin-bottom: 20px;
         }
     </style>
-{/key}
+</Locale>
