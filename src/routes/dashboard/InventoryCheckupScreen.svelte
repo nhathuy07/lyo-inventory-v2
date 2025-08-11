@@ -162,8 +162,8 @@
         }, 200);
     }
 
-    let sort_dir = $state(1);
-    let sort_criteria = $state("");
+    let sort_dir = $state(-1);
+    let sort_criteria = $state("c_on_hand");
     function handleSorting(data: VariantListing[]) {
         if (!sort_criteria) {
             return data;
@@ -376,6 +376,8 @@
             handleResize();
         };
 
+        filtered = handleSorting(filtered)
+
     });
 </script>
 
@@ -390,50 +392,20 @@
     >
         <h2>Danh sách kiểm hàng</h2>
 
-        {#if wwidth >= 650}
-            <div style="display: flex; gap: 10px; width: 100%">
-                <div style="width: 250px;">
-                    <Text
-                        bind:value={keyword}
-                        onchange={handleSearchBarUpdate}
-                        width="300"
-                        placeholder="Tìm kiếm tên sản phẩm, SKU"
-                    ></Text>
-                </div>
 
-                <div style="display: flex; gap: 10px">
-                    <Select
-                        onchange={handleSortBarUpdate}
-                        bind:value={sort_criteria}
-                        options={fields}
-                        placeholder="Sắp xếp theo"
-                    ></Select>
-                    <Segmented
-                        bind:value={sort_dir}
-                        onchange={handleSortBarUpdate}
-                        options={[
-                            { id: 1, icon: "mdi mdi-arrow-up" },
-                            {
-                                id: -1,
-                                icon: "mdi mdi-arrow-down",
-                            },
-                        ]}
-                    ></Segmented>
-                </div>
-
-                <Button icon="mdi mdi-download" onclick={exportToXLSX}>Xuất</Button>
-            </div>
-        {:else}
             <div style="display: flex; flex-direction: column; gap: 5px">
                 <Text
                     bind:value={keyword}
                     onchange={handleSearchBarUpdate}
                     width="300"
+                    icon="mdi mdi-magnify"
                     placeholder="Tìm kiếm tên sản phẩm, SKU"
                 ></Text>
 
                 <div style="display: flex; gap: 5px; max-width: 100%">
-                    <div style="width: calc(100% - 210px);">
+                <i class="mdi mdi-sort" style="display: flex; align-items: center; justify-content: center; vertical-align: center; font-size: 24px"></i>
+
+                    <div style="width: calc(100% - 235px);">
                     <Select
                         onchange={handleSortBarUpdate}
                         bind:value={sort_criteria}
@@ -453,10 +425,13 @@
                             },
                         ]}
                     ></Segmented>
+                    <div style="margin-left: 5px;">
                     <Button icon="mdi mdi-download">Xuất</Button>
+
+                    </div>
                 </div>
             </div>
-        {/if}
+
         <div style="height: 450px;">
             <p style="font-style: italic; margin-top: 0px">
                 ({filtered.length} sản phẩm)

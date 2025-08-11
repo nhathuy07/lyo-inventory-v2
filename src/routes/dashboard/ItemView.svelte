@@ -1706,7 +1706,7 @@
                     }),
                     imgData.h,
                 ]);
-                console.log("fetched image")
+                console.log("fetched image");
             }
         }
 
@@ -1807,40 +1807,46 @@
                 </Field>
 
                 <div class="select-btn-rows">
-                    <Button onclick={select_all} type="secondary block"
-                        >Chọn tất cả</Button
+                    <Button
+                        icon="mdi mdi-check-all"
+                        onclick={select_all}
+                        type="secondary block">Chọn tất cả</Button
                     >
-                    <Button onclick={deselect_all} type="secondary block"
-                        >Bỏ chọn tất cả</Button
+                    <Button
+                        onclick={deselect_all}
+                        type="secondary block"
+                        icon="mdi mdi-select">Bỏ chọn hết</Button
                     >
                 </div>
                 <div class="export-btn-wrapper">
                     <Button
+                        icon="mdi mdi-package-variant-closed-check"
                         type="secondary block"
                         onclick={() => {
                             inventory_checkup_modal_visible = true;
-                        }}>Kiểm hàng</Button
+                        }}>Danh sách Kiểm hàng</Button
                     >
-                    <Button type="secondary block" onclick={exportToXLSX}
-                        >Xuất file Excel</Button
+                    <Button
+                        type="secondary block"
+                        onclick={exportToXLSX}
+                        icon="mdi mdi-download">Xuất file Excel</Button
                     >
                 </div>
 
                 {#if low_sales.size != 0}
                     <div class="toast-warn" style="margin-bottom: 15px">
-                        <p style="margin:0px">
+                        <p style="margin:0px; margin-bottom: 5px">
                             <b>{low_sales.size}</b> mặt hàng có số lượng bán quá
                             thấp
                         </p>
                         {#if !low_sales_filter_id}
-                            <Button type="link" onclick={filter_low_sales}
+                            <Button type="secondary" onclick={filter_low_sales}
                                 >Xem chi tiết</Button
                             >
                         {/if}
                         {#if low_sales_filter_id}
-                            <Button
-                                type="link secondary"
-                                onclick={filter_low_sales}>Quay lại</Button
+                            <Button type="secondary" onclick={filter_low_sales}
+                                >Quay lại</Button
                             >
                         {/if}
                     </div>
@@ -1875,6 +1881,7 @@
                             >
                                 {#if !is_filter_empty}
                                     <Button
+                                        icon="mdi mdi-filter-remove-outline"
                                         id="clear-filter-btn"
                                         onclick={() =>
                                             handle_filter_update(null)}
@@ -1913,6 +1920,7 @@
                         <Button onclick={soft_reload} icon="mdi mdi-refresh">
                             Tải lại
                         </Button>
+                        <Button icon="mdi mdi-download" onclick={exportToXLSX()}></Button>
 
                         <!-- Settings button -->
                         <Button
@@ -1987,12 +1995,19 @@
                     ></InventoryCheckupScreen>
                 </Portal>
             {/if}
-
         </div>
     </Willow>
 
     <style>
         /* Switch accent color */
+        .wx-glue-wrapper {
+            display: none
+        }
+
+        .wx-panel {
+            padding-top: 0px
+        }
+
         .wx-willow-theme {
             --wx-color-primary: #0520c3;
             --wx-filter-border: 1px solid #c1c1c1;
@@ -2045,6 +2060,7 @@
 
         .export-btn-wrapper {
             display: flex;
+            flex-direction: column;
             gap: 10px;
             margin-bottom: 20px;
         }
