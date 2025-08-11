@@ -7,6 +7,7 @@
     import { Axios, HttpStatusCode } from "axios";
     import { goto, invalidateAll } from "$app/navigation";
     import { onMount } from "svelte";
+    import { lazyLoadStylesheets } from "../dashboard/lazyLoadScript";
 
     let authUrl = ""
     if (import.meta.env.MODE === "development") {
@@ -23,6 +24,7 @@
 
     onMount(async () => {
         // TODO: Receive session key from other active tabs if any
+        lazyLoadStylesheets("https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css")
 
         if (sessionStorage.getItem("token") != null) {
             await goto("dashboard", {invalidateAll: false})
@@ -30,8 +32,11 @@
 
     })
 
+    let password_shown = $state(false)
+
     async function auth() {
 
+        password_shown = false
         console.log(username, password)
 
         let r = await a.post(authUrl, JSON.stringify({
@@ -68,12 +73,34 @@
                     ></Text>
                 </Field>
                 <Field label="Password">
+                    {#if !password_shown}
+                    <div style="display: flex; gap: 10px">
+
                     <Text
                         bind:value={password}
                         autocomplete="current-password"
                         type="password"
                         placeholder="Nhập Password"
                     ></Text>
+                    <div style="width: 32px;">
+                    <Button icon="mdi mdi-eye" type="secondary" onclick={() => {password_shown = !password_shown}}></Button>
+                    </div>
+
+                    </div>
+                    {:else}
+                    <div style="display: flex; gap: 10px">
+                    <Text
+                        bind:value={password}
+                        autocomplete="current-password"
+                        type="text"
+                        placeholder="Nhập Password"
+                    ></Text>
+                    <div style="width: 32px;">
+                    <Button icon="mdi mdi-eye-off" type="secondary" onclick={() => {password_shown = !password_shown}}></Button>
+                    </div>
+                    </div>
+                    {/if}
+
                 </Field>
             </form>
 

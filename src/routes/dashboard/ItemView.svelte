@@ -380,7 +380,6 @@
                 // store.getAll()
 
                 cursor_request.onsuccess = (event) => {
-                    // TODO: iterate thru each entry
                     // @ts-expect-error
                     const cursor: IDBCursorWithValue = event.target.result;
 
@@ -623,8 +622,6 @@
                 ]);
 
                 // Purge raw JSON pages more frequently to avoid OOM
-                // TODO: Skip items with modification timestamp smaller than the last acquired timestamp from IndexedDB
-
                 let raw_order_pages = [];
 
                 for (let j = 0; j < x.length; j++) {
@@ -1991,7 +1988,6 @@
                 </Portal>
             {/if}
 
-            <!-- TODO: Mobile-friendly UI -->
         </div>
     </Willow>
 
