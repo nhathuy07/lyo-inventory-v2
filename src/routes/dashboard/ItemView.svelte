@@ -58,8 +58,8 @@
         baseUrl = "http://localhost:8080";
     } else {
         proxyUrl =
-            "https://sp24oze35os8x73r-lyo-inventory-proxy.onrender.com/api";
-        baseUrl = "https://sp24oze35os8x73r-lyo-inventory-proxy.onrender.com";
+            "https://ninee35ef3e539b-inventory-mgmt-proxy.onrender.com/api";
+        baseUrl = "https://ninee35ef3e539b-inventory-mgmt-proxy.onrender.com";
     }
     let accessToken;
     let isAccountAdmin;

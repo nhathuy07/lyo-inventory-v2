@@ -12,7 +12,7 @@
     if (import.meta.env.MODE === "development") {
         authUrl = "http://localhost:8080/auth"
     } else {
-        authUrl = "https://sp24oze35os8x73r-lyo-inventory-proxy.onrender.com/auth";
+        authUrl = "https://ninee35ef3e539b-inventory-mgmt-proxy.onrender.com/auth";
     }
     let a = new Axios();
 
