@@ -754,8 +754,7 @@
             // If (available + incoming) <= 1/3 (sold + outgoing)
 
             if (available + incoming <= (1 / 3) * (sold + outgoing)) {
-                // restock = Math.round(sold + outgoing);
-                restock = Math.round(sold);
+                restock = Math.round(sold + outgoing);
             }
 
             if (sold + outgoing == 0 || restock == 0) {
@@ -1837,7 +1836,8 @@
                 {#if low_sales.size != 0}
                     <div class="toast-warn" style="margin-bottom: 15px">
                         <p style="margin:0px; margin-bottom: 5px">
-                            <b>{low_sales.size}</b> mặt hàng có số lượng bán quá thấp
+                            <b>{low_sales.size}</b> mặt hàng có số lượng bán quá
+                            thấp
                         </p>
                         {#if !low_sales_filter_id}
                             <Button type="secondary" onclick={filter_low_sales}
@@ -2014,14 +2014,12 @@
         }
 
         div .toast-warn {
-            background-color: #FFC04C
-;
+            background-color: #ffdf00;
             padding: 10px;
-            border-radius: 5px;
         }
 
         .lowSales {
-            background: #FFC04C !important;
+            background: #ffdd0030 !important;
         }
 
         .container {
