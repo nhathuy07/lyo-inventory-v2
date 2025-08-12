@@ -753,44 +753,23 @@
 
             // If (available + incoming) <= 1/3 (sold + outgoing)
 
-            if (available + incoming <= (1 / 3) * sold) {
+            if (available + incoming <= (1 / 3) * (sold + outgoing)) {
                 // restock = Math.round(sold + outgoing);
                 restock = Math.round(sold);
-                if (
-                    restock == 0 &&
-                    // @ts-ignore
-                    _inv_info[i].inventory_levels_by_loc_id.get(location_id)
-                        .on_hand == 0
-                ) {
-                    for_deletion.add(i);
-                } else {
-                    _inv_info[i].restock = restock;
-                    _inv_info[i].restock_half = Math.round(restock / 2);
-                    _inv_info[i].restock_third = Math.round(restock / 3);
-                    _inv_info[i].c_incoming = incoming;
-                    _inv_info[i].c_sold = sold;
-                    _inv_info[i].c_on_hand =
-                        _inv_info[i].inventory_levels_by_loc_id.get(
-                            location_id,
-                        )?.on_hand;
-                }
+            }
+
+            if (sold + outgoing == 0 || restock == 0) {
+                for_deletion.add(i);
             } else {
-                if (
-                    _inv_info[i].inventory_levels_by_loc_id.get(location_id)
-                        ?.on_hand == 0
-                ) {
-                    for_deletion.add(i);
-                } else {
-                    _inv_info[i].restock = restock;
-                    _inv_info[i].restock_half = Math.round(restock / 2);
-                    _inv_info[i].restock_third = Math.round(restock / 3);
-                    _inv_info[i].c_incoming = incoming;
-                    _inv_info[i].c_sold = sold;
-                    _inv_info[i].c_on_hand =
-                        _inv_info[i].inventory_levels_by_loc_id.get(
-                            location_id,
-                        )?.on_hand;
-                }
+                _inv_info[i].restock = restock;
+                _inv_info[i].restock_half = Math.round(restock / 2);
+                _inv_info[i].restock_third = Math.round(restock / 3);
+                _inv_info[i].c_incoming = incoming;
+                _inv_info[i].c_sold = sold;
+                _inv_info[i].c_on_hand =
+                    _inv_info[i].inventory_levels_by_loc_id.get(
+                        location_id,
+                    )?.on_hand;
             }
         });
 
@@ -1858,8 +1837,7 @@
                 {#if low_sales.size != 0}
                     <div class="toast-warn" style="margin-bottom: 15px">
                         <p style="margin:0px; margin-bottom: 5px">
-                            <b>{low_sales.size}</b> mặt hàng có số lượng bán quá
-                            thấp
+                            <b>{low_sales.size}</b> mặt hàng có số lượng bán quá thấp
                         </p>
                         {#if !low_sales_filter_id}
                             <Button type="secondary" onclick={filter_low_sales}
@@ -1942,8 +1920,7 @@
                         <Button onclick={soft_reload} icon="mdi mdi-refresh">
                             Tải lại
                         </Button>
-                        <Button icon="mdi mdi-download" onclick={exportToXLSX()}
-                        ></Button>
+                        <Button icon="mdi mdi-download" onclick={exportToXLSX()}></Button>
 
                         <!-- Settings button -->
                         <Button
@@ -2024,11 +2001,11 @@
     <style>
         /* Switch accent color */
         .wx-glue-wrapper {
-            display: none;
+            display: none
         }
 
         .wx-panel {
-            padding-top: 0px;
+            padding-top: 0px
         }
 
         .wx-willow-theme {
@@ -2037,13 +2014,14 @@
         }
 
         div .toast-warn {
-            background-color: #ffc04c;
+            background-color: #FFC04C
+;
             padding: 10px;
             border-radius: 5px;
         }
 
         .lowSales {
-            background: #ffc04c !important;
+            background: #FFC04C !important;
         }
 
         .container {
