@@ -4,7 +4,7 @@ import { type Location } from "./Template";
 let proxyUrl: string;
 let baseUrl: string;
 
-interface OrderRecordV2 {
+export interface OrderRecordV2 {
     sku: string;
     t_unix: number;
     quantity: number;
@@ -14,7 +14,7 @@ interface OrderRecordV2 {
     order_id: number;
 }
 
-interface TransferRecord {
+export interface TransferRecord {
     sku: string;
     t_unix: number;
     quantity: number;
@@ -34,7 +34,7 @@ interface InventoryLevel {
     serial?: string;
 }
 
-interface ProductV2 {
+export interface ProductV2 {
     is_composite: boolean;
     product_id: number;
     variant_id: number;
@@ -135,16 +135,14 @@ export function calculate_restock_data(
         }
     }
 
-    console.log(sales_by_sku)
 
 
     variant_by_id.forEach((variant, id) => {
         const inventory = variant.inventory_level_by_location.get(location_id);
-        // console.log(id, variant, inventory, sales_by_sku.get(variant.sku))
 
-        variant.c_on_hand = Math.max(0, inventory?.incoming || 0);
+        variant.c_on_hand = Math.max(0, inventory?.on_hand || 0);
         variant.c_incoming = Math.max(0, inventory?.incoming || 0)
-        variant.c_available = Math.max(0, inventory?.incoming || 0);
+        variant.c_available = Math.max(0, inventory?.available || 0);
         variant.lot_no = inventory?.lot_no || undefined;
         variant.lot_mfg = inventory?.lot_mfg || undefined;
         variant.lot_exp = inventory?.lot_exp || undefined;
@@ -253,8 +251,8 @@ export function normalizeString(input: string): string {
     let str = input.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     // Lowercase
     str = str.toLowerCase();
-    // Remove special characters, keep a-z and 0-9
-    str = str.replace(/[^a-z0-9]/g, "");
+    // Remove special characters, keep a-z, 0-9, and whitespace
+    str = str.replace(/[^a-z0-9\s]/g, "");
     return str;
 }
 
@@ -316,7 +314,7 @@ export async function get_active_products() {
                                 name: variant.name,
                                 name_normalized: normalizeString(variant.name),
                                 import_price: variant.variant_import_price,
-                                retail_price: variant.retail_price,
+                                retail_price: variant.variant_retail_price,
                                 retail_price_ecomm: 0,
                                 inventory_level_by_location: new Map(),
                             };
@@ -367,7 +365,7 @@ export async function get_active_products() {
                                     break
                                 }
                             }
-                            p_variant.unit = product.unit
+                            p_variant.unit = variant.unit || "<Không xác định>"
                             p_variant.category = product.category
                         }
                     });

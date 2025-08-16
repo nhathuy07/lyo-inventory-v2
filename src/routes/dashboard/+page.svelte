@@ -1,5 +1,6 @@
 <script>
     import ItemView from "./ItemView.svelte";
+    import ItemViewV2 from "./ItemViewV2.svelte";
 
     let k = $state(0)
     function softReload() {
@@ -8,5 +9,5 @@
 
 </script>
 {#key k}
-
+    <ItemViewV2></ItemViewV2>
 {/key}

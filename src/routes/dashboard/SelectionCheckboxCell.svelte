@@ -34,7 +34,8 @@
 </script>
 {#key key.k}
 <div>
-	<Checkbox value={checked} class="table_checkbox" onchange={onChange} />
+	<Checkbox value={checked} class="table_checkbox" onchange={onChange}
+ />
 </div>
 
 {/key}
