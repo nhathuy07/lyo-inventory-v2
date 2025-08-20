@@ -88,6 +88,8 @@ let a = new Axios({
 
 type Record = OrderRecordV2 | TransferRecord;
 
+// TODO: Provide filtering logic here
+
 export function calculate_restock_data(
     records: Record[],
     variant_by_id: Map<number, ProductV2>,
@@ -358,7 +360,6 @@ export async function get_active_products() {
                                 p_variant,
                             );
 
-                            // TODO: Get unit, category and ecomm retail price
                             for (let price of variant.variant_prices) {
                                 if (price.price_list.code == "GIANHAP") {
                                     p_variant.retail_price_ecomm = price.included_tax_price
@@ -718,6 +719,21 @@ export async function saveInventoryTransferToIndexedDB(
             };
         };
     });
+}
+
+export function get_low_sales_skus(
+    p_variants: ProductV2[]
+) {
+    
+    let _r = new Set<string>();
+    
+    p_variants.forEach((v) => {
+        if (v.c_restock < 20) {
+            _r.add(v.sku)
+        }
+    })
+
+    return _r;
 }
 
 export async function fetch_inventory_transfer(

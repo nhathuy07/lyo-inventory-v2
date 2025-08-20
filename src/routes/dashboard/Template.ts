@@ -62,3 +62,15 @@ export function normalizeToEnglish(str: string | undefined | null): string {
 }
 
 
+export interface Filtering {
+    key: string
+    includes: Set<any>
+    operator: ">" | "<" | "=" | ">=" | "<=" | "!=" | "in" | "has"
+    value: any
+    type: "string" | "number" | "array"
+}
+
+export interface Sorting {
+    key: string
+    order: 1 | -1 | 0
+}
