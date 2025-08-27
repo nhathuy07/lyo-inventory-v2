@@ -1,5 +1,4 @@
 <script>
-    import ItemView from "./ItemView.svelte";
     import ItemViewV2 from "./ItemViewV2.svelte";
 
     let k = $state(0)

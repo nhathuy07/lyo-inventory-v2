@@ -2,7 +2,8 @@
     // @ts-ignore
     import { Grid, Willow } from "wx-svelte-grid";
     // @ts-ignore
-    import { Button, Select, Portal, Modal } from "wx-svelte-core";
+    import { Button, Select, Portal, Modal, Popup } from "wx-svelte-core";
+    // import {ContextMenu} from "wx-svelte-menu"
     // @ts-ignore
     import { Locale } from "wx-svelte-core";
     import {
@@ -15,12 +16,18 @@
         type TransferRecord,
         fetch_inventory_transfer,
         get_low_sales_skus,
+        setLastDataUpdate,
     } from "./DataPipelineV2";
     import SelectionCheckboxCell from "./SelectionCheckboxCell.svelte";
     import ImageCell from "./ImageCell.svelte";
     import { vi } from "./Localization";
     import { onMount, setContext } from "svelte";
-    import { type Filtering, type Location, type Sorting } from "./Template";
+    import {
+        normalizeToEnglish,
+        type Filtering,
+        type Location,
+        type Sorting,
+    } from "./Template";
     import { applyAction } from "$app/forms";
     import { lazyLoadStylesheets } from "./lazyLoadScript";
     import LoadingThrobber from "./LoadingThrobber.svelte";
@@ -28,7 +35,15 @@
 
     import { Axios } from "axios";
     import { goto } from "$app/navigation";
+
     import HeaderWithSortUi from "./HeaderWithSortUI.svelte";
+
+    import {
+        export_all_to_xlsx,
+        export_selected_to_xlsx,
+        export_transfer_sheet_to_xlsx,
+        _actual_export_handler,
+    } from "./Export2Excel";
 
     const columns = [
         {
@@ -104,17 +119,17 @@
                 },
             ],
         },
-        {
-            id: "suppliers",
-            resize: true,
-            width: 160, // Add width for consistency (if needed)
-            header: [
-                {
-                    cell: HeaderWithSortUi,
-                    text: "NCC",
-                },
-            ],
-        },
+        // {
+        //     id: "suppliers",
+        //     resize: true,
+        //     width: 160, // Add width for consistency (if needed)
+        //     header: [
+        //         {
+        //             cell: HeaderWithSortUi,
+        //             text: "NCC",
+        //         },
+        //     ],
+        // },
         {
             id: "c_on_hand",
             resize: true,
@@ -194,11 +209,11 @@
         },
     ];
 
-    const filter_by_id: Map<string, Filtering> = $state(new Map())
-    const sort_by_id: Map<string, Sorting> = $state(new Map())
+    const filter_by_id: Map<string, Filtering> = $state(new Map());
+    const sort_by_id: Map<string, Sorting> = $state(new Map());
 
-    setContext("filterbyid", filter_by_id)
-    setContext("sortbyid", sort_by_id)
+    setContext("filterbyid", filter_by_id);
+    setContext("sortbyid", sort_by_id);
 
     const responsive_fields = {
         800: {
@@ -276,17 +291,17 @@
                         },
                     ],
                 },
-                {
-                    id: "suppliers",
-                    resize: true,
-                    width: 140, // Add width for consistency (if needed)
-                    header: [
-                        {
-                            cell: HeaderWithSortUi,
-                            text: "NCC",
-                        },
-                    ],
-                },
+                // {
+                //     id: "suppliers",
+                //     resize: true,
+                //     width: 140, // Add width for consistency (if needed)
+                //     header: [
+                //         {
+                //             cell: HeaderWithSortUi,
+                //             text: "NCC",
+                //         },
+                //     ],
+                // },
                 {
                     id: "c_on_hand",
                     resize: true,
@@ -333,7 +348,7 @@
                 },
                 {
                     id: "import_price",
-                                        header: [
+                    header: [
                         {
                             cell: HeaderWithSortUi,
                             text: "Giá nhập",
@@ -344,7 +359,7 @@
                 },
                 {
                     id: "retail_price",
-                                        header: [
+                    header: [
                         {
                             cell: HeaderWithSortUi,
                             text: "Thành tiền (Shop)",
@@ -359,7 +374,8 @@
                         {
                             cell: HeaderWithSortUi,
                             text: "Thành tiền (TMĐT)",
-                        }],
+                        },
+                    ],
                     resize: true,
                     width: 180, // 140 + 40
                 },
@@ -370,8 +386,8 @@
     let data: ProductV2[] = $state([]);
     let is_loading = $state(false);
     let is_settings_open = $state(false);
-    let updateKeys = $state({headerSorterKey: 0, dsource: []})
-    setContext("updatekeys", updateKeys)
+    let updateKeys = $state({ headerSorterKey: 0, dsource: [], dfiltered: [] });
+    setContext("updatekeys", updateKeys);
 
     let datasource: ProductV2[] = $state([]);
     // setContext("datasource", datasource);
@@ -387,12 +403,14 @@
 
     let selected_skus = $state(new Set<string>());
     let checkbox_update_key = $state({ k: 0 });
+    let filter_update_key = $state({ k: 0 });
     setContext("selected_skus", selected_skus);
     setContext("checkbox_key", checkbox_update_key);
+    setContext("filter_update_key", filter_update_key);
     let proxyUrl = "";
     let baseUrl = "";
 
-    let low_sales_skus: Set<string> = $state(new Set<string>())
+    let low_sales_skus: Set<string> = $state(new Set<string>());
 
     if (import.meta.env.MODE === "development") {
         proxyUrl = "http://localhost:8080/api";
@@ -442,7 +460,7 @@
             variant_by_id,
             c_location_id,
         );
-        low_sales_skus = get_low_sales_skus(datasource)
+        low_sales_skus = get_low_sales_skus(datasource);
 
         rowCount = datasource.length;
         grid_key++;
@@ -450,25 +468,47 @@
         is_loading = false;
     }
 
+    function select_all() {
+        for (let x of datasource) {
+            selected_skus.add(x.sku);
+        }
+        checkbox_update_key.k += 1;
+    }
+
+    function deselect_all() {
+        selected_skus.clear();
+        checkbox_update_key.k += 1;
+    }
+
     async function initialize() {
         is_loading = true;
+        let loc_and_variant = await Promise.all([
+            get_locations(),
+            get_active_products(),
+        ]);
+        locations = loc_and_variant[0];
+        variant_by_id = loc_and_variant[1];
 
-        locations = await get_locations();
-        variant_by_id = await get_active_products();
-        order_records = await fetch_order_record(variant_by_id);
-        transfer_records = await fetch_inventory_transfer(variant_by_id);
+        let order_and_transfer_records = await Promise.all([
+            fetch_order_record(variant_by_id),
+            fetch_inventory_transfer(variant_by_id),
+        ]);
+        order_records = order_and_transfer_records[0];
+        transfer_records = order_and_transfer_records[1];
         datasource = calculate_restock_data(
             [...order_records, ...transfer_records],
             variant_by_id,
             locations[0].id,
         );
 
-        low_sales_skus = get_low_sales_skus(datasource)
-        console.log("low", low_sales_skus)
+        setLastDataUpdate();
+
+        low_sales_skus = get_low_sales_skus(datasource);
+        // console.log("low", low_sales_skus)
         rowCount = datasource.length;
         c_location_id = locations[0].id;
-        console.log(c_location_id);
-        console.log(datasource);
+        // console.log(c_location_id);
+        // console.log(datasource);
         grid_key++;
 
         is_loading = false;
@@ -476,6 +516,179 @@
         updateKeys.dsource = datasource;
         updateKeys.headerSorterKey++;
     }
+
+    let last_filter;
+
+    function enforce_filter(ukey: number) {
+        console.log(filter_by_id);
+        data = [];
+        if (filter_by_id.size) {
+            datasource = calculate_restock_data(
+                [...order_records, ...transfer_records],
+                variant_by_id,
+                c_location_id,
+            );
+
+            filter_by_id.forEach((fval, fkey) => {
+                datasource = datasource.filter((v) => {
+                    let x = fval.includes.has(v[fkey as keyof ProductV2]);
+                    return x;
+                });
+            });
+        } else {
+            datasource = calculate_restock_data(
+                [...order_records, ...transfer_records],
+                variant_by_id,
+                c_location_id,
+            );
+        }
+        // console.log(datasource)
+        // updateKeys.dsource = datasource
+        rowCount = datasource.length;
+    }
+
+    function enforce_sorting(ukey: number) {
+        console.log(sort_by_id);
+        if (sort_by_id.size) {
+            sort_by_id.forEach((sval, skey) => {
+                datasource.sort((a, b) => {
+                    if (typeof a[skey as keyof ProductV2] == "number") {
+                        if (sval.order == 1) {
+                            return (
+                                (a[skey as keyof ProductV2] as number) -
+                                (b[skey as keyof ProductV2] as number)
+                            );
+                        } else {
+                            return (
+                                (b[skey as keyof ProductV2] as number) -
+                                (a[skey as keyof ProductV2] as number)
+                            );
+                        }
+                    } else if (typeof a[skey as keyof ProductV2] == "string") {
+                        const cmp_a = normalizeToEnglish(
+                            a[skey as keyof ProductV2] as string,
+                        );
+                        const cmp_b = normalizeToEnglish(
+                            b[skey as keyof ProductV2] as string,
+                        );
+                        if (sval.order == 1) {
+                            return cmp_a.localeCompare(cmp_b);
+                        } else if (sval.order == -1) {
+                            return cmp_b.localeCompare(cmp_a);
+                        } else {
+                            return 0;
+                        }
+                    } else {
+                        return 0;
+                    }
+                });
+            });
+        }
+    }
+
+    let viewing_low_sales = $state(false);
+    let last_sales_filter: Map<string, Filtering>;
+    function filter_low_sales_items(skip_updating = false) {
+        viewing_low_sales = !viewing_low_sales;
+        if (viewing_low_sales) {
+            // @ts-ignore
+            let s = new Set();
+            datasource.forEach((v) => {
+                if (v.c_restock < 20) {
+                    s.add(v.c_restock);
+                }
+            });
+            //  datasource.filter((v) => {return v.c_restock < 20})
+            console.log("s", s);
+            // @ts-ignore
+            last_sales_filter = new Map(filter_by_id);
+            filter_by_id.clear();
+            filter_by_id.set("c_restock", {
+                key: "c_restock",
+                operator: "<",
+                value: 20,
+                type: "number",
+                includes: s,
+            });
+        } else {
+            filter_by_id.clear();
+            if (last_sales_filter) {
+                last_sales_filter.forEach((v, k) => {
+                    filter_by_id.set(k, v);
+                });
+                // filter_by_id = last_sales_filter
+            }
+            last_sales_filter.clear();
+        }
+
+        if (skip_updating) {
+            return;
+        } else {
+            filter_update_key.k += 1;
+        }
+    }
+
+    let viewing_low_stocks = $state(false);
+    function filter_low_stock_items() {
+        viewing_low_stocks = !viewing_low_stocks;
+
+        if (viewing_low_sales) {
+            // Toggle to default state
+            filter_low_sales_items(true);
+        }
+
+        if (viewing_low_stocks) {
+            // @ts-ignore
+            let s = new Set();
+            datasource.forEach((v) => {
+                if (v.c_on_hand < 20) {
+                    s.add(v.c_on_hand);
+                }
+            });
+            //  datasource.filter((v) => {return v.c_restock < 20})
+            console.log("s", s);
+            // @ts-ignore
+            last_sales_filter = new Map(filter_by_id);
+            filter_by_id.clear();
+            filter_by_id.set("c_on_hand", {
+                key: "c_on_hand",
+                operator: "<",
+                value: 20,
+                type: "number",
+                includes: s,
+            });
+        } else {
+            filter_by_id.clear();
+            if (last_sales_filter) {
+                last_sales_filter.forEach((v, k) => {
+                    filter_by_id.set(k, v);
+                });
+                // filter_by_id = last_sales_filter
+            }
+            last_sales_filter.clear();
+        }
+        console.log(filter_by_id);
+        filter_update_key.k += 1;
+    }
+
+    let export_popup_parent;
+    let export_popup_shown = $state(false);
+
+    function on_export_popup_cancel() {
+        export_popup_shown = false;
+    }
+
+    // TODO: Whenever the filter is updated, update the list of valid items for further filtering
+
+    let last_filter_update_key = 0;
+    $effect(() => {
+        if (last_filter_update_key != filter_update_key.k) {
+            enforce_filter(filter_update_key.k);
+            enforce_sorting(filter_update_key.k);
+            last_filter_update_key = filter_update_key.k;
+            grid_key += 1;
+        }
+    });
 
     onMount(async () => {
         lazyLoadStylesheets(
@@ -488,26 +701,112 @@
 
 <Locale words={vi}>
     <Willow>
-
         <div style="display: flex; gap: 10px; padding-bottom: 10px">
-            <Button onclick={initialize} type="primary" icon="mdi mdi-refresh"></Button>
-            <div style="width: 200px">
+            <div>
+                <Button
+                    onclick={initialize}
+                    type="primary"
+                    icon="mdi mdi-refresh"
+                ></Button>
+            </div>
+            <div style="width: 250px; display:flex; align-items: center">
+                <span>Kho:&nbsp;</span>
                 <Select
                     bind:value={c_location_id}
                     options={locations}
                     onchange={handle_location_update}
-                    width="200"
+                    width="100"
                     placeholder="Chọn kho hàng..."
                 ></Select>
             </div>
-            <div>
-                <Button>Chọn tất cả</Button>
-                <Button>Bỏ chọn tất cả</Button>
+            <div style="display: flex; gap: 5px">
+                <Button onclick={select_all}>Chọn tất cả</Button>
+                <Button onclick={deselect_all}>Bỏ chọn tất cả</Button>
 
-                <Button icon="mdi mdi-package-variant-closed-check"
-                    >Kiểm hàng</Button
+                <Button
+                    icon="mdi mdi-package-variant-closed-check"
+                    onclick={filter_low_stock_items}>Kiểm hàng</Button
                 >
-                <Button icon="mdi mdi-download">Xuất Excel</Button>
+                <div bind:this={export_popup_parent}>
+                    <Button
+                        onclick={() => {
+                            export_popup_shown = !export_popup_shown;
+                        }}
+                        icon="mdi mdi-download">Xuất Excel</Button
+                    >
+                </div>
+                {#if export_popup_shown}
+                    <Portal>
+                        <Popup
+                            parent={export_popup_parent}
+                            at="bottom"
+                            oncancel={on_export_popup_cancel}
+                        >
+                            <div
+                                class="download-popup"
+                                style="padding: 10px; display: flex; flex-direction: column; gap: 5px"
+                            >
+                                <p style="margin-bottom: 5px; margin-top: 5px">
+                                    <b>Xuất phiếu nhập hàng</b>
+                                </p>
+                                {#if selected_skus.size != 0}
+                                    <Button
+                                        type="primary"
+                                        onclick={async () => {
+                                            await export_selected_to_xlsx(
+                                                selected_skus,
+                                                datasource,
+                                            );
+                                        }}>Xuất sản phẩm được chọn</Button
+                                    >
+                                {:else}
+                                    <Button
+                                        type="primary"
+                                        onclick={async () => {
+                                            await export_selected_to_xlsx(
+                                                selected_skus,
+                                                datasource,
+                                            );
+                                        }}>Xuất sản phẩm đang hiển thị</Button
+                                    >
+                                {/if}
+                                <Button
+                                    type="secondary"
+                                    onclick={async () => {
+                                        await export_all_to_xlsx(
+                                            order_records,
+                                            transfer_records,
+                                            variant_by_id,
+                                            c_location_id,
+                                        );
+                                    }}>Xuất toàn bộ sản phẩm trong kho</Button
+                                >
+                                <hr style="color: gray; width: 1px" />
+                                <div>
+                                    <Button
+                                        type="block secondary"
+                                        onclick={async () => {
+                                            await export_transfer_sheet_to_xlsx(
+                                                order_records,
+                                                transfer_records,
+                                                variant_by_id,
+                                                locations,
+                                            );
+                                        }}>Xuất đơn chuyển hàng</Button
+                                    >
+
+                                    <p style="margin: 0px;">
+                                        <i
+                                            >(Bao gồm hàng tồn kho trong chi
+                                            nhánh trung tâm)</i
+                                        >
+                                    </p>
+                                </div>
+                            </div>
+                        </Popup>
+                    </Portal>
+                {/if}
+
                 <Button
                     icon="mdi mdi-cog"
                     onclick={() => {
@@ -518,25 +817,58 @@
                 ></Button>
             </div>
         </div>
-        
-        {#if low_sales_skus.size}
 
-        <div
-            style="width: 100%; padding-left: 10px; background-color: #ffc748; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; border-radius: 5px"
-        >
-            <p><b>{low_sales_skus.size}</b> mặt hàng có sản lượng thấp.</p>
-            <div style="height: 32px;">
-                <Button>Xem chi tiết</Button> 
+        {#if low_sales_skus.size && !viewing_low_stocks}
+            <div
+                style="width: 100%; padding-left: 10px; background-color: #ffc748; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; border-radius: 5px"
+            >
+                {#if !viewing_low_sales}
+                    <p>
+                        <b>{low_sales_skus.size}</b> mặt hàng có sản lượng thấp (trong
+                        1 tháng, dưới 20).
+                    </p>
+                    <div style="height: 32px;">
+                        <Button
+                            onclick={() => {
+                                filter_low_sales_items(false);
+                            }}>Xem chi tiết</Button
+                        >
+                    </div>
+                {:else}
+                    <p>
+                        <i class="mdi mdi-eye"></i>&nbsp;Đang xem
+                        <b>{low_sales_skus.size}</b> mặt hàng sản lượng thấp (trong
+                        1 tháng, dưới 20).
+                    </p>
+                    <div style="height: 32px;">
+                        <Button
+                            onclick={() => {
+                                filter_low_sales_items(false);
+                            }}>Quay lại</Button
+                        >
+                    </div>
+                {/if}
             </div>
-        </div>
-
         {/if}
 
+        {#if viewing_low_stocks}
+            <div
+                style="width: 100%; padding-left: 10px; background-color: #ffc748; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; border-radius: 5px"
+            >
+                <p>
+                    <i class="mdi mdi-eye"></i>&nbsp;Đang xem
+                    <b>danh sách kiểm hàng</b> (mặt hàng tồn kho dưới 20).
+                </p>
+                <div style="height: 32px;">
+                    <Button onclick={filter_low_stock_items}>Quay lại</Button>
+                </div>
+            </div>
+        {/if}
 
         <div style="height: calc(100dvh - 110px);">
             {#key grid_key}
                 <Grid
-                autoRowHeight
+                    autoRowHeight
                     bind:this={grid_api}
                     {columns}
                     {data}
@@ -544,19 +876,18 @@
                     onrequestdata={dataProvider}
                     dynamic={{ rowCount }}
                     sizes={{ rowHeight: 165 }}
-                    rowStyle={(row: any) => (low_sales_skus.has(row.sku) && c_location_id === 122671 ? 'lowSales' : '')}
+                    rowStyle={(row: any) =>
+                        row.c_restock < 20 && c_location_id === 122671
+                            ? "lowSales"
+                            : ""}
                 />
 
                 <style>
                     .lowSales {
-                        background-color: #FF9248 !important
+                        background-color: #ff9248 !important;
                     }
                 </style>
-
             {/key}
-
-
-
         </div>
 
         {#if is_loading}
@@ -577,9 +908,11 @@
                 <SettingsModal bind:shown={is_settings_open}></SettingsModal>
             </Portal>
         {/if}
-
-
-
-
     </Willow>
+    <style>
+        .wx-willow-theme {
+            --wx-color-primary: #0520c3;
+            --wx-filter-border: 1px solid #c1c1c1;
+        }
+    </style>
 </Locale>

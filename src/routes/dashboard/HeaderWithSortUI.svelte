@@ -16,10 +16,13 @@
     import type {Sorting} from "./Template"
     import {normalizeToEnglish, type Filtering} from "./Template"
     import Page from "../+page.svelte";
+    import { write } from "xlsx";
     let { column, cell, api } = $props();
     let updateKeys: Object = getContext("updatekeys");
     let filter_by_id: Map<string, Filtering> = getContext("filterbyid");
     let sort_by_id: Map<string, Sorting> = getContext("sortbyid");
+
+    let filter_update_key: any = getContext("filter_update_key");
 
     let show_dropdown = $state(false);
     let col_width = 0;
@@ -127,7 +130,7 @@
                 filtered_unique_vals.clear()
                 for (let _u of unique_vals) {
 
-                    if ( normalizeToEnglish(_u.toLowerCase()).includes(normalizeToEnglish(string_filtering_value).toLowerCase()) ) {
+                    if ( normalizeToEnglish(_u.toLowerCase() ?? "").includes(normalizeToEnglish(string_filtering_value).toLowerCase() ?? "") ) {
                         filtered_unique_vals.add(_u)
                         // included_unique_values.add(_u)
                     }
@@ -148,9 +151,24 @@
     }
 
     async function writeFilter() {
+
+        if (!has_updated) {
+            return
+        }
+
+        has_updated = false
+        
         if (t == "string") filter_by_id.set(column.id, {key: column.id, includes: included_unique_values, operator: "in", value: string_filtering_value, type: t})
         else if (t == "number") filter_by_id.set(column.id, {key: column.id, includes: included_unique_values, operator: number_filtering_operator, value: number_filtering_value, type: t})
         
+        filter_update_key.k+=1
+
+        // for (let v of updateKeys.dsource) {
+        //     unique_vals.add(v[column.id as keyof ProductV2]);
+        //     filtered_unique_vals.add(v[column.id as keyof ProductV2]);
+        //     included_unique_values.add(v[column.id as keyof ProductV2])
+        // }
+
     }
 
     let timer: number | undefined = undefined
@@ -186,7 +204,9 @@
         }
     }
 
+    let has_updated = false
     async function update_filter() {
+        has_updated = true
         if (t == "string") {
             if (timer) {
                 clearTimeout(timer)
@@ -224,7 +244,7 @@
                 u++;
             }, 1)
         }
-        await writeFilter()
+        // await writeFilter()
     }
 
     function get_sorter_state() {
@@ -238,16 +258,19 @@
 
     function handle_sorter_toggle() {
         sort_by_id.set(column.id, {key: column.id, order: sort_direction})
+        console.log(sort_by_id)
+        filter_update_key.k += 1
     }
 
 
     async function handle_item_checkbox_toggling(ev: any, item: any) {
+        has_updated = true
         if (ev.value === true) {
             included_unique_values.add(item)
         } else {
             included_unique_values.delete(item)
         }
-        await writeFilter()
+        // await writeFilter()
     }
 
     async function handle_selectall_toggle() {
@@ -270,17 +293,29 @@
                 width: 250,
             });
         } else {
+
             api.exec("resize-column", {
                 id: column.id,
                 width: col_width,
             });
+            await writeFilter()
+            
         }
     }
 
     async function erase_filter() {
         sort_by_id.delete(column.id)
         filter_by_id.delete(column.id)
-        reset()
+                    api.exec("resize-column", {
+                id: column.id,
+                width: col_width,
+            });
+        await reset()
+
+        // await writeFilter()
+        filter_update_key.k+=1
+
+
 
     }
 
@@ -320,12 +355,21 @@
     >
         <p>{cell.text}</p>
         <div style="max-height: 30px; display: flex" id="toggle-btn-wrapper">
+            {#if sort_by_id.has(cell.id) || filter_by_id.has(cell.id)}
+            <Button
+                onclick={handle_dropdown_toggle}
+                icon="mdi mdi-sort"
+                type="primary"
+                style="height: 30px;"
+            ></Button>
+            {:else}
             <Button
                 onclick={handle_dropdown_toggle}
                 icon="mdi mdi-sort"
                 type="secondary"
                 style="height: 30px;"
             ></Button>
+            {/if}
             {#if show_dropdown}
                 {#if t == "string"}
                 <div
@@ -347,7 +391,7 @@
                                 <Button type="block " icon="mdi mdi-sort-alphabetical-descending">Z đến A</Button> -->
                                 <Segmented onchange={handle_sorter_toggle} bind:value={sort_direction} options={[
                                     {id: 1, label:"A đến Z", icon:"mdi mdi-sort-alphabetical-ascending"},
-                                    {id: 2, label:"Z đến A", icon:"mdi mdi-sort-alphabetical-descending"}
+                                    {id: -1, label:"Z đến A", icon:"mdi mdi-sort-alphabetical-descending"}
                                 ]}></Segmented>
                                 </button>
                             
@@ -400,7 +444,7 @@
                                 <Button type="block " icon="mdi mdi-sort-alphabetical-descending">Z đến A</Button> -->
                                 <Segmented onchange={handle_sorter_toggle} bind:value={sort_direction} options={[
                                     {id: 1, label:"Tăng dần", icon:"mdi mdi-arrow-up"},
-                                    {id: 2, label:"Giảm dần", icon:"mdi mdi-arrow-down"}
+                                    {id: -1, label:"Giảm dần", icon:"mdi mdi-arrow-down"}
                                 ]}></Segmented>
                                 </button>
                             

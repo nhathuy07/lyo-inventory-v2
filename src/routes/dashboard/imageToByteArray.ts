@@ -3,9 +3,15 @@ import { Axios } from "axios"
 let a = new Axios()
 let canvas = document.createElement("canvas")
 
+interface ImageInfo {
+    b: ArrayBuffer | undefined,
+    w: number,
+    h: number
+}
+
 export async function imageToArrayBuffer(src: string, width: number = 140) {
 
-    let image = document.createElement("img")
+    let image: HTMLImageElement = document.createElement("img")
     const ctx = canvas.getContext("2d")
 
     // Fetch image from the web
@@ -15,7 +21,7 @@ export async function imageToArrayBuffer(src: string, width: number = 140) {
 
     if (res.status == 200) {
 
-        return new Promise<Object>((resolve, reject) => {
+        return new Promise<ImageInfo>((resolve, reject) => {
             image.src = URL.createObjectURL(res.data)
             image.onload = () => {
                 // console.log("original", image.width, image.height)
@@ -32,6 +38,7 @@ export async function imageToArrayBuffer(src: string, width: number = 140) {
                 canvas.toBlob(async (blob) => {
                     URL.revokeObjectURL(image.src)
                     // document.removeChild(image)
+                    // @ts-ignore
                     image =undefined
                     resolve({
                         b: await blob?.arrayBuffer(),

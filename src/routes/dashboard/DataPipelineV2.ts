@@ -234,13 +234,15 @@ export function sleep(ms: number) {
 }
 
 export function is_promotional_item(brand: string) {
+    const br = brand.toLowerCase()
     if (!brand) {
         return false
     }
     if (
-        brand.toLowerCase() == "tặng" ||
-        brand.toLowerCase() == "sale" ||
-        brand.toLowerCase() == "combo"
+        br == "tặng" ||
+        br == "sale" ||
+        br == "combo" ||
+        br.includes("kđh")
     ) {
         return true;
     } else {
@@ -300,7 +302,7 @@ export async function get_active_products() {
                         if (!is_promotional_item(product.brand)) {
                             let p_variant: ProductV2 = {
                                 is_composite: variant.composite,
-                                brand: product.brand,
+                                brand: product.brand ?? "<Không xác định>",
                                 variant_id: variant.id,
                                 product_id: product.id,
                                 sku: variant.sku,
