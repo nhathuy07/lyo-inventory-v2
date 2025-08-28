@@ -2,10 +2,9 @@
     // @ts-ignore
     import { Willow, Text, Button, Field } from "wx-svelte-core";
     import { Axios, HttpStatusCode } from "axios";
-    import { goto, invalidateAll } from "$app/navigation";
+    import { goto } from "$app/navigation";
     import { onMount } from "svelte";
     import { lazyLoadStylesheets } from "../dashboard/lazyLoadScript";
-    import { query } from "$app/server";
 
     let authUrl = "";
     let checkOnlyUrl = "";
