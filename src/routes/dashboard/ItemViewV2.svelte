@@ -398,6 +398,7 @@
     let locations: Location[] = $state([]);
 
     let c_location_id: number = $state(-1);
+    let c_location: Location;
     let rowCount = $state(0);
     let grid_key = $state(0);
 
@@ -444,9 +445,14 @@
 
     let grid_api = $state();
 
+    const revoke_broadcast_channel = new BroadcastChannel("revoke")
     async function logout() {
         await a.delete(`${baseUrl}/revoke`);
         sessionStorage.clear();
+        
+        // Sign out of other tabs as well since the token is valid now
+        revoke_broadcast_channel.postMessage("revoke")
+
         goto("/authentication");
     }
 
@@ -461,11 +467,18 @@
             c_location_id,
         );
         low_sales_skus = get_low_sales_skus(datasource);
+        selected_skus.clear()
+        filter_by_id.clear()
+        sort_by_id.clear()
 
         rowCount = datasource.length;
-        grid_key++;
 
         is_loading = false;
+        c_location = locations.find((v) => {return v.id == c_location_id}) as Location
+    
+        grid_key++;
+
+    
     }
 
     function select_all() {
@@ -515,6 +528,8 @@
         // @ts-ignore
         updateKeys.dsource = datasource;
         updateKeys.headerSorterKey++;
+
+        c_location = locations[0]
     }
 
     let last_filter;
@@ -753,32 +768,48 @@
                                     <Button
                                         type="primary"
                                         onclick={async () => {
-                                            await export_selected_to_xlsx(
+                                            is_loading = true
+                                            const x = await export_selected_to_xlsx(
                                                 selected_skus,
                                                 datasource,
+                                                c_location
                                             );
+                                            is_loading = false
                                         }}>Xuất sản phẩm được chọn</Button
                                     >
                                 {:else}
                                     <Button
                                         type="primary"
                                         onclick={async () => {
+                                            is_loading = true
+
                                             await export_selected_to_xlsx(
                                                 selected_skus,
                                                 datasource,
-                                            );
+                                                c_location
+                                            ).finally(() => {
+                                            is_loading = false
+                                            });
+
                                         }}>Xuất sản phẩm đang hiển thị</Button
                                     >
                                 {/if}
                                 <Button
                                     type="secondary"
                                     onclick={async () => {
+                                        is_loading = true
+
+
                                         await export_all_to_xlsx(
                                             order_records,
                                             transfer_records,
                                             variant_by_id,
                                             c_location_id,
-                                        );
+                                            c_location
+                                        ).finally(() => {
+                                        is_loading = false
+
+                                        });
                                     }}>Xuất toàn bộ sản phẩm trong kho</Button
                                 >
                                 <hr style="color: gray; width: 1px" />
@@ -786,12 +817,15 @@
                                     <Button
                                         type="block secondary"
                                         onclick={async () => {
+                                            is_loading = true
                                             await export_transfer_sheet_to_xlsx(
                                                 order_records,
                                                 transfer_records,
                                                 variant_by_id,
                                                 locations,
-                                            );
+                                            ).finally(() => {
+                                                is_loading = false
+                                            });
                                         }}>Xuất đơn chuyển hàng</Button
                                     >
 

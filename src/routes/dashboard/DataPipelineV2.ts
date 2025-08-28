@@ -76,15 +76,10 @@ if (import.meta.env.MODE === "development") {
 }
 
 export function obtain_access_token() {
+    console.log("token in use: ", sessionStorage.getItem("token"))
     return "Bearer " + sessionStorage.getItem("token");
 }
 
-let a = new Axios({
-    headers: {
-        "Content-Type": "application/json",
-        Authorization: obtain_access_token(),
-    },
-});
 
 type Record = OrderRecordV2 | TransferRecord;
 
@@ -171,6 +166,14 @@ export function calculate_restock_data(
 }
 
 export async function get_locations(): Promise<Location[]> {
+
+    let a = new Axios({
+    headers: {
+        "Content-Type": "application/json",
+        Authorization: obtain_access_token(),
+    },
+    });
+
     let resp = await a.get(`${proxyUrl}/admin/locations.json`);
     // let location_by_id: Map<number, string> = new Map()
     let location_by_id: Location[] = [];
@@ -234,6 +237,9 @@ export function sleep(ms: number) {
 }
 
 export function is_promotional_item(brand: string) {
+    if (!brand) {
+        return false
+    }
     const br = brand.toLowerCase()
     if (!brand) {
         return false
@@ -265,6 +271,14 @@ export async function get_active_products() {
     let p_variant_by_ids: Map<number, ProductV2> = new Map();
     let running = true;
     let page = 1;
+
+    let a = new Axios({
+    headers: {
+        "Content-Type": "application/json",
+        Authorization: obtain_access_token(),
+    },
+});
+
     while (running) {
         const resp = await Promise.all([
             a.get(`${proxyUrl}/admin/products.json`, {
@@ -483,6 +497,14 @@ export async function updateIndexedDB(records: OrderRecordV2[]) {
 }
 
 export async function fetch_order_record(variant_by_id: Map<number, ProductV2>) {
+
+let a = new Axios({
+    headers: {
+        "Content-Type": "application/json",
+        Authorization: obtain_access_token(),
+    },
+});
+
     const last_update_utc = getLastDataUpdate();
     // const today_utc = new Date().toUTCString()
     let existing_order_ids = new Set<number>();
@@ -742,6 +764,13 @@ export async function fetch_inventory_transfer(
     p_variants: Map<number, ProductV2>,
 ) {
     // received OR shipped
+
+    let a = new Axios({
+    headers: {
+        "Content-Type": "application/json",
+        Authorization: obtain_access_token(),
+    },
+});
 
     const last_update_utc = getLastDataUpdate();
 
