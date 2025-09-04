@@ -83,7 +83,6 @@ export function obtain_access_token() {
 
 type Record = OrderRecordV2 | TransferRecord;
 
-// TODO: Provide filtering logic here
 
 export function calculate_restock_data(
     records: Record[],
@@ -144,6 +143,10 @@ export function calculate_restock_data(
         variant.lot_mfg = inventory?.lot_mfg || undefined;
         variant.lot_exp = inventory?.lot_exp || undefined;
         variant.serial = inventory?.serial || undefined;
+
+        if (variant.name_normalized.includes("melaxin")) {
+            console.log(variant.name, variant.sku, variant.c_available, variant.c_incoming, sales_by_sku.get(variant.sku) ?? 0)
+        }
 
         // @ts-ignore
         if (
